@@ -1,0 +1,1205 @@
+:root {
+    --primary-color: #007AFF;
+    --background-color: #F2F2F7;
+    --sidebar-width: 300px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    /* Status Colors */
+    --status-playing: #34C759;
+    --status-queued: #FF9500;
+    --status-resting: #5856D6;
+    --status-waiting: #FF3B30;
+    --status-nogames: #8E8E93;
+    /* Mesh Gradient Variables */
+    --court-gradient-1: hsl(150, 40%, 75%);
+    --court-gradient-2: hsl(140, 35%, 80%);
+    --court-gradient-3: hsl(145, 40%, 75%);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--background-color);
+}
+
+.container {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    background-color: white;
+    border-right: 1px solid #E5E5EA;
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    margin-bottom: var(--spacing-lg);
+}
+
+.import-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-md);
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 12px;
+}
+
+#playerImport {
+    padding: var(--spacing-sm);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    min-height: 80px;
+    resize: vertical;
+    background: white;
+    font-size: 0.9em;
+}
+
+.primary-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    transition: opacity 0.2s;
+}
+
+.primary-button:hover {
+    opacity: 0.9;
+}
+
+.players-list {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.player-item {
+    padding: var(--spacing-sm);
+    border-bottom: 1px solid #E5E5EA;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+}
+
+.player-item:last-child {
+    border-bottom: none;
+}
+
+.player-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.status-chip {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.status-chip.playing {
+    background-color: rgba(52, 199, 89, 0.1);
+    color: var(--status-playing);
+}
+
+.status-chip.queued {
+    background-color: rgba(255, 149, 0, 0.1);
+    color: var(--status-queued);
+}
+
+.status-chip.resting {
+    background-color: rgba(88, 86, 214, 0.1);
+    color: var(--status-resting);
+}
+
+.status-chip.waiting {
+    background-color: rgba(255, 59, 48, 0.1);
+    color: var(--status-waiting);
+}
+
+.status-chip.nogames {
+    background-color: rgba(142, 142, 147, 0.1);
+    color: var(--status-nogames);
+}
+
+.status-chip i {
+    font-size: 10px;
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: var(--spacing-lg);
+}
+
+.courts-container {
+    padding: var(--spacing-lg);
+    display: grid;
+    gap: var(--spacing-lg);
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.court-2d {
+    aspect-ratio: 6.1/13.4;
+    max-width: 320px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(
+        165deg,
+        var(--court-gradient-1) 0%,
+        var(--court-gradient-2) 50%,
+        var(--court-gradient-3) 100%
+    );
+    border-radius: 24px;
+    overflow: hidden;
+}
+
+.court-simulation {
+    flex: 1;
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+}
+
+.court-bottom-section {
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 20px 20px 0 0;
+    padding: var(--spacing-md);
+    box-shadow: 
+        0 -4px 12px rgba(0, 0, 0, 0.08),
+        0 -2px 4px rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.court-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-md);
+}
+
+.court-number {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: white;
+}
+
+.court-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 500;
+}
+
+.time-elapsed {
+    color: #666;
+    margin-left: 4px;
+    font-weight: normal;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--status-playing);
+}
+
+.elapsed-time {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: white;
+    font-weight: 500;
+}
+
+.court-content {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.court-lines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 2px solid rgba(255, 255, 255, 0.95);
+    margin: var(--spacing-md);
+}
+
+.doubles-sideline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.doubles-sideline.left {
+    top: 15%;
+}
+
+.doubles-sideline.right {
+    bottom: 15%;
+}
+
+.service-court {
+    position: absolute;
+    width: 25%;
+    height: 35%;
+    border: 1px dashed rgba(255, 255, 255, 0.75);
+}
+
+.service-court.top-left {
+    top: 15%;
+    left: 0;
+}
+
+.service-court.top-right {
+    top: 15%;
+    right: 0;
+}
+
+.service-court.bottom-left {
+    bottom: 15%;
+    left: 0;
+}
+
+.service-court.bottom-right {
+    bottom: 15%;
+    right: 0;
+}
+
+.net {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: white;
+    transform: translateY(-50%);
+}
+
+.net-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px;
+    height: 12px;
+    background: white;
+    border-radius: 50%;
+}
+
+.team-section {
+    position: relative;
+    z-index: 1;
+    padding: var(--spacing-sm);
+    transition: opacity 0.3s ease;
+}
+
+.team-info {
+    background: rgba(255, 255, 255, 0.98);
+    padding: 8px;
+    border-radius: 12px;
+    box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.06),
+        0 1px 2px rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.team-players {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.player {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: transparent;
+    transition: background-color 0.2s ease;
+}
+
+.player span {
+    font-size: 0.9em;
+    font-weight: 500;
+    color: #333;
+}
+
+.player:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+/* Remove unnecessary player elements */
+.player i,
+.player-action-btn {
+    display: none;
+}
+
+/* Active court styles */
+.court-2d.active .court-status {
+    color: var(--status-playing);
+}
+
+.court-2d.active .status-dot {
+    background: var(--status-playing);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .team-info {
+        padding: 6px var(--spacing-sm);
+    }
+
+    .player {
+        padding: 4px 6px;
+    }
+
+    .player-action-btn {
+        opacity: 1;
+        padding: 4px 6px;
+    }
+}
+
+.queue-preview {
+    margin-top: var(--spacing-md);
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 16px;
+    padding: var(--spacing-md);
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.08),
+        0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.queue-preview h3 {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: var(--spacing-sm);
+}
+
+.queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.queue-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.85em;
+}
+
+.queue-number {
+    background: var(--primary-color);
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8em;
+}
+
+.queue-players {
+    flex: 1;
+}
+
+.estimated-time {
+    color: #666;
+    font-size: 0.8em;
+}
+
+.court-2d:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.12),
+        0 8px 16px rgba(0, 0, 0, 0.06),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* Update empty state styles */
+.court-2d.empty {
+    opacity: 1;
+}
+
+/* Remove empty team info styles since we're not showing them */
+.team-info.empty {
+    display: none;
+}
+
+/* Keep other empty state styles the same */
+.queue-preview.empty {
+    background: rgba(255, 255, 255, 0.9);
+    min-height: 80px;
+}
+
+.quick-add-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    width: 100%;
+    text-align: center;
+    padding: 0 var(--spacing-lg);
+    transition: all 0.3s ease;
+}
+
+.quick-add-btn {
+    width: 100%;
+    max-width: 200px;
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    color: var(--primary-color);
+    font-size: 1em;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    padding: var(--spacing-md);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin: 0 auto;
+}
+
+.quick-add-btn:hover {
+    background: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.quick-add-btn i {
+    font-size: 1.2em;
+}
+
+/* Add mobile tab styles */
+.mobile-tabs {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: var(--spacing-sm);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+.tab-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: var(--spacing-sm);
+    background: none;
+    border: none;
+    color: #8E8E93;
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tab-btn i {
+    font-size: 1.4em;
+}
+
+.tab-btn.active {
+    color: var(--primary-color);
+}
+
+.view {
+    display: none;
+}
+
+.view.active {
+    display: block;
+}
+
+.mobile-players-content {
+    padding: var(--spacing-lg);
+    background: white;
+}
+
+/* Update mobile styles */
+@media (max-width: 768px) {
+    .mobile-tabs {
+        display: flex;
+        justify-content: space-around;
+    }
+
+    .sidebar {
+        display: none; /* Hide sidebar on mobile */
+    }
+
+    /* Adjust main container padding */
+    .container {
+        padding-bottom: 0; /* Remove previous padding */
+    }
+
+    /* Adjust courts container */
+    .courts-container {
+        padding: var(--spacing-sm);
+        padding-bottom: calc(var(--spacing-lg) + 60px); /* Add space for tab bar */
+        min-height: 100vh; /* Ensure full height */
+        overflow-y: auto; /* Enable scrolling */
+        gap: var(--spacing-md); /* Reduce gap between courts */
+        align-items: start; /* Align to top */
+    }
+
+    .court-2d {
+        max-width: none;
+        width: 100%;
+        aspect-ratio: 6.1/10; /* Shorter ratio for mobile */
+        margin: 0 auto;
+        max-height: calc(100vh - 180px); /* Account for header, tabs, and padding */
+    }
+
+    /* Adjust players view */
+    .mobile-players-content {
+        min-height: 100vh;
+        padding-bottom: calc(var(--spacing-lg) + 60px); /* Space for tab bar */
+        overflow-y: auto;
+    }
+
+    /* Ensure tab bar stays on top */
+    .mobile-tabs {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* Add safe area padding for modern iOS devices */
+    @supports (padding: env(safe-area-inset-bottom)) {
+        .mobile-tabs {
+            padding-bottom: calc(var(--spacing-sm) + env(safe-area-inset-bottom));
+        }
+
+        .courts-container,
+        .mobile-players-content {
+            padding-bottom: calc(var(--spacing-lg) + 60px + env(safe-area-inset-bottom));
+        }
+    }
+
+    /* Adjust team info for better mobile fit */
+    .team-info {
+        padding: 6px 10px;
+        border-radius: 12px;
+    }
+
+    .team-players {
+        gap: var(--spacing-sm);
+    }
+
+    .player {
+        font-size: 0.8em;
+        padding: 3px 6px;
+    }
+
+    /* Adjust queue preview for mobile */
+    .queue-preview {
+        margin-top: var(--spacing-sm);
+        padding: var(--spacing-sm);
+    }
+
+    .queue-item {
+        font-size: 0.8em;
+    }
+
+    .quick-add-container {
+        padding: 0 var(--spacing-md);
+    }
+
+    .quick-add-btn {
+        max-width: 180px;
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+}
+
+/* Add iPhone SE / smaller device optimization */
+@media (max-width: 768px) and (max-height: 667px) {
+    .court-2d {
+        aspect-ratio: 6.1/9; /* Even shorter for small devices */
+        max-height: calc(100vh - 160px);
+    }
+}
+
+/* Update mesh gradient overlay for softer effect */
+.court-2d::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(
+        circle at 50% 50%,
+        rgba(255, 255, 255, 0.2) 0%,
+        rgba(255, 255, 255, 0.1) 25%,
+        transparent 50%
+    );
+    pointer-events: none;
+}
+
+/* Ensure court lines are visible on all backgrounds */
+.court-lines {
+    border-color: rgba(255, 255, 255, 0.95);
+}
+
+.doubles-sideline {
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.service-court {
+    border-color: rgba(255, 255, 255, 0.75);
+}
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid #E5E5EA;
+}
+
+.modal-header h3 {
+    font-size: 1.2em;
+    font-weight: 600;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.2em;
+    color: #8E8E93;
+    cursor: pointer;
+    padding: 4px;
+}
+
+.modal-body {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.available-players h4,
+.selected-players h4 {
+    color: #666;
+    margin-bottom: var(--spacing-md);
+}
+
+.players-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+}
+
+.player-chip {
+    padding: var(--spacing-md);
+    border-radius: 12px;
+    background: var(--background-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    border: 2px solid transparent;
+}
+
+.player-chip:hover {
+    background: rgba(0, 122, 255, 0.05);
+    border-color: rgba(0, 122, 255, 0.1);
+}
+
+.player-chip.selected {
+    background: rgba(0, 122, 255, 0.1);
+    border-color: var(--primary-color);
+}
+
+.player-chip i {
+    color: var(--primary-color);
+    font-size: 1.1em;
+}
+
+.check-icon {
+    position: absolute;
+    right: 8px;
+    color: var(--primary-color) !important;
+}
+
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-lg);
+    color: #666;
+}
+
+.empty-state i {
+    font-size: 2em;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+}
+
+.empty-state p {
+    font-weight: 500;
+    margin-bottom: var(--spacing-sm);
+}
+
+.empty-state span {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.modal-footer {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid #E5E5EA;
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 100%;
+        height: 100%;
+        max-height: none;
+        border-radius: 0;
+    }
+
+    .players-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+
+    .player-chip {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+}
+
+/* Add transition styles */
+.court-2d .team-section {
+    transition: all 0.3s ease;
+}
+
+.court-2d.empty .team-section {
+    opacity: 0;
+}
+
+.court-2d.active .team-section {
+    opacity: 1;
+}
+
+.quick-add-container {
+    transition: opacity 0.3s ease;
+}
+
+.court-2d.active .quick-add-container {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Add danger button style */
+.danger-button {
+    background: rgba(255, 59, 48, 0.1);
+    color: var(--status-waiting);
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    transition: all 0.2s ease;
+}
+
+.danger-button:hover {
+    background: rgba(255, 59, 48, 0.15);
+    transform: translateY(-1px);
+}
+
+.danger-button i {
+    opacity: 0.8;
+}
+
+/* Update start game button style */
+.start-game-btn {
+    width: 100%;
+    max-width: 200px;
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    color: var(--status-playing);
+    font-size: 1em;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    padding: var(--spacing-md);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin: 0 auto;
+}
+
+.start-game-btn:hover {
+    background: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.start-game-btn i {
+    color: var(--status-playing);
+}
+
+/* Add any missing component-specific styles */
+.court-2d.ready .status-dot {
+    background: var(--status-queued);
+}
+
+.court-2d.in_progress .status-dot {
+    background: var(--status-playing);
+}
+
+/* Add transition for status changes */
+.court-2d {
+    transition: all 0.3s ease;
+}
+
+.team-section {
+    transition: opacity 0.3s ease;
+}
+
+/* Toast System */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.toast {
+    min-width: 250px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transform: translateX(120%);
+    transition: transform 0.3s ease;
+    cursor: default;
+}
+
+.toast.show {
+    transform: translateX(0);
+}
+
+.toast i {
+    font-size: 1.2em;
+}
+
+.toast-success {
+    background: var(--status-playing);
+    color: white;
+}
+
+.toast-error {
+    background: var(--status-waiting);
+    color: white;
+}
+
+.toast-info {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+    .toast-container {
+        top: auto;
+        bottom: calc(60px + env(safe-area-inset-bottom));
+        left: 50%;
+        transform: translateX(-50%);
+        width: calc(100% - 32px);
+    }
+
+    .toast {
+        width: 100%;
+        transform: translateY(120%);
+    }
+
+    .toast.show {
+        transform: translateY(0);
+    }
+}
+
+/* Add queue button styles */
+.queue-action-container {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.add-to-queue-btn {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    color: var(--primary-color);
+    font-size: 0.9em;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 12px;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.add-to-queue-btn:hover {
+    background: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Update court actions layout */
+.court-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+/* Consistent button styles */
+.court-button {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 12px;
+    border: none;
+    background: rgba(0, 0, 0, 0.04);
+    font-size: 0.9em;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.court-button:hover {
+    background: rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+}
+
+/* Queue section */
+.queue-section {
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.queue-header {
+    font-size: 0.8em;
+    color: #666;
+    margin-bottom: var(--spacing-sm);
+}
+
+.queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.queue-player {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.02);
+    font-size: 0.85em;
+}
+
+/* Queue Modal Team Styles */
+.queue-modal .team-selection {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.team-indicator {
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: auto;
+}
+
+.player-chip.team-a {
+    background: rgba(52, 199, 89, 0.1);
+    border: 1px solid rgba(52, 199, 89, 0.2);
+}
+
+.player-chip.team-b {
+    background: rgba(0, 122, 255, 0.1);
+    border: 1px solid rgba(0, 122, 255, 0.2);
+}
+
+.player-chip.team-a .team-indicator {
+    background: var(--status-playing);
+    color: white;
+}
+
+.player-chip.team-b .team-indicator {
+    background: var(--primary-color);
+    color: white;
+}
+
+.matchup-preview {
+    text-align: center;
+    padding: var(--spacing-md);
+    margin: var(--spacing-md) 0;
+    border-radius: 12px;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.matchup-preview.ready {
+    background: rgba(52, 199, 89, 0.1);
+    color: var(--status-playing);
+    font-weight: 500;
+}
+
+/* Queue display in court */
+.queue-match {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 8px;
+    font-size: 0.9em;
+}
+
+.queue-match .vs {
+    color: #666;
+    font-weight: 500;
+    padding: 0 var(--spacing-sm);
+}
+
+/* Secondary button style */
+.secondary-button {
+    background: rgba(0, 0, 0, 0.05);
+    color: #333;
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    transition: all 0.2s ease;
+}
+
+.secondary-button:hover {
+    background: rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.secondary-button i {
+    opacity: 0.7;
+}
+
+/* Update status colors */
+.court-2d.in_progress .court-status {
+    color: var(--status-playing);
+}
+
+.court-2d.ready .court-status {
+    color: var(--status-queued);
+}
+
+.court-2d.empty .court-status {
+    color: var(--status-nogames);
+} 

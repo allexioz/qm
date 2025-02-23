@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Badminton Queue Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="mobile-tabs">
+        <button class="tab-btn active" data-view="courts">
+            <i class="fas fa-table-tennis"></i>
+            Courts
+        </button>
+        <button class="tab-btn" data-view="players">
+            <i class="fas fa-users"></i>
+            Players
+        </button>
+    </div>
+
+    <div class="views-container">
+        <div class="view active" id="courts-view">
+            <div class="container">
+                <aside class="sidebar">
+                    <div class="sidebar-header">
+                        <h2>Players List 🏸</h2>
+                    </div>
+                    <div class="import-section">
+                        <textarea id="playerImport" placeholder="Enter player names (one per line)"></textarea>
+                        <button id="importButton" class="secondary-button">
+                            <i class="fas fa-file-import"></i> Import Players
+                        </button>
+                        <button id="resetButton" class="danger-button">
+                            <i class="fas fa-trash-alt"></i> Reset All Data
+                        </button>
+                    </div>
+                    <div class="players-list" id="playersList">
+                        <!-- Players will be dynamically added here -->
+                    </div>
+                </aside>
+                <main class="main-content">
+                    <div class="courts-container">
+                        <div class="court-2d active" data-court-id="court-1">
+                            <div class="court-header">
+                                <div class="court-number">Court 1</div>
+                                <div class="court-status">
+                                    <span class="status-dot"></span>
+                                    In Play
+                                </div>
+                                <div class="elapsed-time">
+                                    <i class="fas fa-clock"></i>
+                                    <span class="time-display">12:34</span>
+                                </div>
+                            </div>
+
+                            <div class="court-content">
+                                <div class="team-section team-a">
+                                    <div class="team-info">
+                                        <div class="team-players">
+                                            <!-- Players will be dynamically added here -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="court-lines">
+                                    <div class="doubles-sideline left"></div>
+                                    <div class="doubles-sideline right"></div>
+                                    <div class="service-court top-left"></div>
+                                    <div class="service-court top-right"></div>
+                                    <div class="service-court bottom-left"></div>
+                                    <div class="service-court bottom-right"></div>
+                                    <div class="net">
+                                        <div class="net-center"></div>
+                                    </div>
+                                </div>
+
+                                <div class="team-section team-b">
+                                    <div class="team-info">
+                                        <div class="team-players">
+                                            <!-- Players will be dynamically added here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="queue-preview">
+                                <h3>Up Next</h3>
+                                <div class="queue-list">
+                                    <div class="queue-item">
+                                        <span class="queue-number">1</span>
+                                        <div class="queue-players">
+                                            <span>Eve, Frank</span>
+                                        </div>
+                                        <span class="estimated-time">~5 min</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="court-2d empty" data-court-id="court-2">
+                            <div class="court-header">
+                                <div class="court-number">Court 2</div>
+                                <div class="court-status">
+                                    <span class="status-dot"></span>
+                                    Empty
+                                </div>
+                                <div class="elapsed-time">
+                                    <i class="fas fa-clock"></i>
+                                    <span class="time-display">--:--</span>
+                                </div>
+                            </div>
+
+                            <div class="court-content">
+                                <div class="team-section team-a">
+                                    <div class="team-info">
+                                        <div class="team-players">
+                                            <!-- Players will be dynamically added here -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="court-lines">
+                                    <div class="doubles-sideline left"></div>
+                                    <div class="doubles-sideline right"></div>
+                                    <div class="service-court top-left"></div>
+                                    <div class="service-court top-right"></div>
+                                    <div class="service-court bottom-left"></div>
+                                    <div class="service-court bottom-right"></div>
+                                    <div class="net">
+                                        <div class="net-center"></div>
+                                    </div>
+                                </div>
+
+                                <div class="team-section team-b">
+                                    <div class="team-info">
+                                        <div class="team-players">
+                                            <!-- Players will be dynamically added here -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="quick-add-container">
+                                    <button class="quick-add-btn">
+                                        <i class="fas fa-plus-circle"></i>
+                                        <span>Quick Add Players</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="queue-preview empty">
+                                <h3>No Players in Queue</h3>
+                                <div class="empty-state-message">
+                                    <i class="fas fa-users"></i>
+                                    <span>Ready for new players</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+        <div class="view" id="players-view">
+            <div class="mobile-players-content">
+                <div class="sidebar-header">
+                    <h2>Players List 🏸</h2>
+                </div>
+                <div class="import-section">
+                    <textarea id="playerImport" placeholder="Enter player names (one per line)"></textarea>
+                    <button id="importButton" class="secondary-button">
+                        <i class="fas fa-file-import"></i> Import Players
+                    </button>
+                    <button id="resetButton" class="danger-button">
+                        <i class="fas fa-trash-alt"></i> Reset All Data
+                    </button>
+                </div>
+                <div class="players-list" id="playersList">
+                    <!-- Players will be dynamically added here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal" id="quickAddModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Quick Add Players</h3>
+                <button class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="available-players">
+                    <h4>Available Players</h4>
+                    <div class="players-grid" id="availablePlayersList">
+                        <!-- Available players will be added here -->
+                    </div>
+                </div>
+                <div class="selected-players">
+                    <h4>Selected Players (0/4)</h4>
+                    <div class="players-grid" id="selectedPlayersList">
+                        <!-- Selected players will appear here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="secondary-button" id="cancelQuickAdd">Cancel</button>
+                <button class="primary-button" id="confirmQuickAdd">
+                    <i class="fas fa-check"></i>
+                    Assign Players
+                </button>
+            </div>
+        </div>
+    </div>
+    <div id="queueModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add to Queue</h3>
+                <button class="close-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="queue-selected-players">
+                    <h4>Selected Players (0)</h4>
+                </div>
+                <div id="queuePlayersList" class="players-grid">
+                    <!-- Players will be inserted here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelQueue" class="secondary-button">Cancel</button>
+                <button id="confirmQueue" class="primary-button">Add to Queue</button>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html> 
