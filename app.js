@@ -72,22 +72,10 @@ class Court {
     }
 
     startGame() {
-        console.group('🎾 Court Start Game');
-        const previousState = {
-            status: this.status,
-            startTime: this.startTime,
-            timerId: this.timerId
-        };
-        console.log('Previous state:', previousState);
-        
+        console.group('🎮 Starting Game');
         this.status = 'in_progress';
         this.startTime = Date.now();
-        
-        console.log('New state:', {
-            status: this.status,
-            startTime: this.startTime,
-            timerId: this.timerId
-        });
+        console.log('Game started at:', this.startTime);
         console.groupEnd();
     }
 
@@ -116,27 +104,12 @@ class Court {
     }
 
     getElapsedTime() {
-        console.group('⏱️ Getting Elapsed Time');
-        if (!this.startTime) {
-            console.log('No start time set');
-            console.groupEnd();
-            return null;
-        }
-
-        const now = Date.now();
-        const elapsed = Math.floor((now - this.startTime) / 1000);
+        if (!this.startTime) return null;
         
-        console.log('Time calculation:', {
-            now,
-            startTime: this.startTime,
-            elapsed,
-            difference: now - this.startTime
-        });
-        
+        const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
         const minutes = Math.floor(elapsed / 60);
         const seconds = elapsed % 60;
-
-        console.groupEnd();
+        
         return { minutes, seconds };
     }
 
@@ -392,6 +365,9 @@ class GameManager {
                 hasTimer: !!court.timerId
             });
         });
+
+        // Restore timers for in-progress games
+        this.restoreTimers();
         console.groupEnd();
     }
 
@@ -472,18 +448,23 @@ class GameManager {
         try {
             court.startGame();
             
-            // Update player statuses and increment games count for Quick Add
+            // Update player statuses and increment games count
             court.players.forEach(player => {
                 const oldStatus = player.status;
                 player.status = 'playing';
-                player.gamesPlayed++; // Increment games count when starting via Quick Add
+                player.gamesPlayed++;
                 player.lastGameTime = Date.now();
                 console.log(`Player ${player.name}: ${oldStatus} -> ${player.status} (Games: ${player.gamesPlayed})`);
             });
 
+            // Save state before emitting events
+            this.saveState();
+
+            // Emit events after state is saved
             Toast.show('Game started!', Toast.types.SUCCESS);
             this.eventBus.emit('game:started', court);
-            this.saveState();
+            this.eventBus.emit('players:updated');
+            
         } catch (error) {
             console.error('❌ Failed to start game:', error);
             Toast.show('Failed to start game', Toast.types.ERROR);
@@ -679,6 +660,15 @@ class GameManager {
             console.log(`Initialized view for court ${court.id}`);
         });
         console.groupEnd();
+    }
+
+    // Add method to restore timers after page load
+    restoreTimers() {
+        this.courts.forEach(court => {
+            if (court.status === 'in_progress' && court.startTime) {
+                this.eventBus.emit('game:started', court);
+            }
+        });
     }
 }
 
@@ -890,13 +880,15 @@ class CourtView {
         this.gameManager = gameManager;
         this.eventBus = eventBus;
         this.element = null;
-        this.render();
-        this.attachEventListeners();
-        
-        console.log('🎾 Initialized CourtView:', {
-            courtId: court.id,
-            hasGameManager: !!gameManager,
-            hasEventBus: !!eventBus
+        this.initialize();
+    }
+
+    initialize() {
+        // Listen for game started event
+        this.eventBus.on('game:started', (court) => {
+            if (court.id === this.court.id) {
+                this.startGameTimer();
+            }
         });
     }
 
@@ -904,8 +896,19 @@ class CourtView {
         return `
             <div class="court-2d ${this.court.status}" data-court-id="${this.court.id}">
                 <div class="court-simulation">
-                    ${this.renderHeader()}
-                    ${this.renderContent()}
+                    <div class="court-header">
+                        <div class="court-number">Court ${this.court.id.split('-')[1]}</div>
+                        <div class="court-status">
+                            <span class="status-dot"></span>
+                            ${this.getStatusText()}
+                            <span class="time-elapsed"></span>
+                        </div>
+                    </div>
+                    <div class="court-content">
+                        ${this.renderTeamSection('a')}
+                        ${this.renderCourtLines()}
+                        ${this.renderTeamSection('b')}
+                    </div>
                 </div>
                 <div class="court-bottom-section">
                     ${this.renderActions()}
@@ -914,188 +917,68 @@ class CourtView {
         `;
     }
 
-    renderHeader() {
-        const statusText = this.getStatusText();
-        const timeDisplay = this.court.status === 'in_progress' ? 
-            `<span class="time-elapsed">(${this.getTimeDisplay()})</span>` : '';
-
-        return `
-            <div class="court-header">
-                <div class="court-number">Court ${this.court.id.split('-')[1]}</div>
-                <div class="court-status">
-                    <span class="status-dot"></span>
-                    ${statusText} ${timeDisplay}
-                </div>
-            </div>
-        `;
-    }
-
-    renderContent() {
-        return `
-            <div class="court-content">
-                ${this.renderTeamSection('a')}
-                ${this.renderCourtLines()}
-                ${this.renderTeamSection('b')}
-            </div>
-        `;
-    }
-
-    renderActions() {
-        let primaryButton = '';
-        let queueButton = '';
-        let completeButton = '';
-        
-        if (this.court.status === 'ready') {
-            primaryButton = `
-                <button class="court-button start-game-btn">
-                    <i class="fas fa-play"></i>
-                    Start Game
-                </button>
-            `;
-        } else if (this.court.status === 'empty' || this.court.players.length < 4) {
-            const remainingSlots = 4 - this.court.players.length;
-            primaryButton = `
-                <button class="court-button quick-add-btn">
-                    <i class="fas fa-plus"></i>
-                    Add ${remainingSlots} Player${remainingSlots === 1 ? '' : 's'}
-                </button>
-            `;
-        }
-
-        if (this.court.status === 'in_progress') {
-            completeButton = `
-                <button class="court-button complete-game-btn">
-                    <i class="fas fa-flag"></i>
-                    Complete Game
-                </button>
-            `;
-        }
-
-        // Only show queue button if court is not empty
-        if (this.court.status !== 'empty') {
-            queueButton = `
-                <button class="court-button add-to-queue-btn">
-                    <i class="fas fa-user-plus"></i>
-                    Queue
-                </button>
-            `;
-        }
-
-        return `
-            <div class="court-actions">
-                ${primaryButton}
-                ${completeButton}
-                ${queueButton}
-                ${this.renderQueueSection()}
-            </div>
-        `;
-    }
-
-    renderQueueSection() {
-        if (!this.court.queue.length) {
-            return '';
-        }
-
-        // Group players into matches of 4
-        const matches = [];
-        for (let i = 0; i < this.court.queue.length; i += 4) {
-            const matchPlayers = this.court.queue.slice(i, i + 4);
-            // Only create a match if we have exactly 4 players
-            if (matchPlayers.length === 4) {
-                matches.push({
-                    teamA: matchPlayers.slice(0, 2).map(p => p.name.split(' ')[0]).join(' & '),
-                    teamB: matchPlayers.slice(2, 4).map(p => p.name.split(' ')[0]).join(' & ')
-                });
-            }
-        }
-
-        // Only show up to 3 matches
-        const displayMatches = matches.slice(0, 3);
-        const remainingMatches = matches.length - 3;
-
-        return `
-            <div class="queue-section">
-                <div class="queue-header">Next Up (${matches.length} ${matches.length === 1 ? 'match' : 'matches'})</div>
-                <div class="queue-list">
-                    ${displayMatches.map((match, index) => `
-                        <div class="queue-match">
-                            <span class="match-number">${index + 1}</span>
-                            <span class="team-a">${match.teamA}</span>
-                            <span class="vs">vs</span>
-                            <span class="team-b">${match.teamB}</span>
-                        </div>
-                    `).join('')}
-                    ${remainingMatches > 0 ? `
-                        <div class="queue-match" style="justify-content: center; color: #666;">
-                            +${remainingMatches} more ${remainingMatches === 1 ? 'match' : 'matches'}
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-        `;
-    }
-
     mount(container) {
-        // Create a temporary div to hold the court HTML
+        // Create the element from rendered HTML
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = this.render();
-        
-        // Get the first child (our court element)
+        tempDiv.innerHTML = this.render().trim();
         this.element = tempDiv.firstElementChild;
-        
+
         // Clear container and append the new element
         container.innerHTML = '';
         container.appendChild(this.element);
-        
-        // Now attach event listeners
+
+        // Attach event listeners
         this.attachEventListeners();
+
+        // Start timer if game is in progress
+        if (this.court.status === 'in_progress' && this.court.startTime) {
+            this.startGameTimer();
+        }
+    }
+
+    startGameTimer() {
+        if (!this.element) return;
+
+        // Clear any existing timer
+        if (this.court.timerId) {
+            clearInterval(this.court.timerId);
+        }
+
+        // Start a new timer
+        this.court.timerId = setInterval(() => {
+            this.updateTimeDisplay();
+        }, 1000);
+
+        // Initial update
+        this.updateTimeDisplay();
+    }
+
+    updateTimeDisplay() {
+        if (!this.element) return;
+
+        const elapsed = this.court.getElapsedTime();
+        if (!elapsed) return;
+
+        const timeDisplay = this.element.querySelector('.time-elapsed');
+        if (timeDisplay) {
+            timeDisplay.textContent = ` (${elapsed.minutes}:${elapsed.seconds.toString().padStart(2, '0')})`;
+        }
     }
 
     update() {
-        console.group('🔄 Updating Court View');
-        console.log('Court state:', {
-            id: this.court.id,
-            status: this.court.status,
-            startTime: this.court.startTime,
-            timerId: this.court.timerId
-        });
+        if (!this.element || !this.element.parentNode) return;
         
-        if (this.element) {
-            // Create new element
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = this.render();
-            const newElement = tempDiv.firstElementChild;
-            
-            if (!newElement) {
-                console.error('Failed to create new element');
-                console.groupEnd();
-                return;
-            }
-
-            // Replace old element with new one
-            try {
-                this.element.parentNode.replaceChild(newElement, this.element);
-                this.element = newElement;
-                this.attachEventListeners();
-                
-                // Restart timer if game is in progress
-                if (this.court.status === 'in_progress') {
-                    console.log('Game in progress, starting timer');
-                    this.startGameTimer();
-                } else {
-                    console.log('Game not in progress, stopping timer');
-                    this.stopGameTimer();
-                }
-                
-                console.log('Court view updated successfully');
-            } catch (error) {
-                console.error('Failed to update court view:', error);
-            }
-        } else {
-            console.warn('No element to update');
+        const newElement = document.createElement('div');
+        newElement.innerHTML = this.render().trim();
+        
+        this.element.parentNode.replaceChild(newElement.firstElementChild, this.element);
+        this.element = newElement.firstElementChild;
+        
+        this.attachEventListeners();
+        
+        if (this.court.status === 'in_progress' && this.court.startTime) {
+            this.startGameTimer();
         }
-        
-        console.groupEnd();
     }
 
     attachEventListeners() {
@@ -1210,47 +1093,6 @@ class CourtView {
         `;
     }
 
-    startGameTimer() {
-        console.group('⏱️ Starting Game Timer');
-        
-        if (this.court.timerId) {
-            console.log('Clearing existing timer:', this.court.timerId);
-            clearInterval(this.court.timerId);
-            this.court.timerId = null;
-        }
-
-        // Find both time displays
-        const statusTimeDisplay = this.element.querySelector('.time-elapsed');
-        const headerTimeDisplay = this.element.querySelector('.time-display');
-
-        if (!statusTimeDisplay || !headerTimeDisplay) {
-            console.error('Time display elements not found');
-            console.groupEnd();
-            return;
-        }
-
-        console.log('Setting up timer with start time:', new Date(this.court.startTime).toISOString());
-        
-        const updateTimer = () => {
-            const elapsed = this.court.getElapsedTime();
-            if (elapsed) {
-                const timeString = `${elapsed.minutes.toString().padStart(2, '0')}:${elapsed.seconds.toString().padStart(2, '0')}`;
-                // Update both displays
-                statusTimeDisplay.textContent = `(${timeString})`;
-                headerTimeDisplay.textContent = timeString;
-                console.log('Timer displays updated:', timeString);
-            }
-        };
-
-        // Update immediately
-        updateTimer();
-
-        // Set up interval
-        this.court.timerId = setInterval(updateTimer, 1000);
-        console.log('Timer started with ID:', this.court.timerId);
-        console.groupEnd();
-    }
-
     stopGameTimer() {
         console.group('🛑 Stopping Game Timer');
         if (this.court.timerId) {
@@ -1303,6 +1145,101 @@ class CourtView {
                 <span>${player.name}</span>
             </div>
         `).join('');
+    }
+
+    renderActions() {
+        let primaryButton = '';
+        let queueButton = '';
+        let completeButton = '';
+        
+        if (this.court.status === 'ready') {
+            primaryButton = `
+                <button class="court-button start-game-btn">
+                    <i class="fas fa-play"></i>
+                    Start Game
+                </button>
+            `;
+        } else if (this.court.status === 'empty' || this.court.players.length < 4) {
+            const remainingSlots = 4 - this.court.players.length;
+            primaryButton = `
+                <button class="court-button quick-add-btn">
+                    <i class="fas fa-plus"></i>
+                    Add ${remainingSlots} Player${remainingSlots === 1 ? '' : 's'}
+                </button>
+            `;
+        }
+
+        if (this.court.status === 'in_progress') {
+            completeButton = `
+                <button class="court-button complete-game-btn">
+                    <i class="fas fa-flag"></i>
+                    Complete Game
+                </button>
+            `;
+        }
+
+        // Only show queue button if court is not empty
+        if (this.court.status !== 'empty') {
+            queueButton = `
+                <button class="court-button add-to-queue-btn">
+                    <i class="fas fa-user-plus"></i>
+                    Queue
+                </button>
+            `;
+        }
+
+        return `
+            <div class="court-actions">
+                ${primaryButton}
+                ${completeButton}
+                ${queueButton}
+                ${this.renderQueueSection()}
+            </div>
+        `;
+    }
+
+    renderQueueSection() {
+        if (!this.court.queue.length) {
+            return '';
+        }
+
+        // Group players into matches of 4
+        const matches = [];
+        for (let i = 0; i < this.court.queue.length; i += 4) {
+            const matchPlayers = this.court.queue.slice(i, i + 4);
+            // Only create a match if we have exactly 4 players
+            if (matchPlayers.length === 4) {
+                matches.push({
+                    teamA: matchPlayers.slice(0, 2).map(p => p.name.split(' ')[0]).join(' & '),
+                    teamB: matchPlayers.slice(2, 4).map(p => p.name.split(' ')[0]).join(' & ')
+                });
+            }
+        }
+
+        // Only show up to 3 matches
+        const displayMatches = matches.slice(0, 3);
+        const remainingMatches = matches.length - 3;
+
+        return `
+            <div class="queue-section">
+                <div class="queue-header">Next Up (${matches.length} ${matches.length === 1 ? 'match' : 'matches'})</div>
+                <div class="queue-list">
+                    ${displayMatches.map((match, index) => `
+                        <div class="queue-match">
+                            <span class="match-number">${index + 1}</span>
+                            <span class="team-a">${match.teamA}</span>
+                            <span class="vs">vs</span>
+                            <span class="team-b">${match.teamB}</span>
+                        </div>
+                    `).join('')}
+                    ${remainingMatches > 0 ? `
+                        <div class="queue-match" style="justify-content: center; color: #666;">
+                            +${remainingMatches} more ${remainingMatches === 1 ? 'match' : 'matches'}
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
     }
 }
 
