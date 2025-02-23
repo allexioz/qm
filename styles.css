@@ -86,6 +86,9 @@ body {
     justify-content: center;
     gap: var(--spacing-sm);
     transition: opacity 0.2s;
+    margin-bottom: var(--spacing-sm);
+    height: 40px;
+    min-width: 100px;
 }
 
 .primary-button:hover {
@@ -607,29 +610,26 @@ body {
 }
 
 .quick-add-btn {
-    flex: 1;
     width: 100%;
-    max-width: none;
-    background: rgba(255, 255, 255, 0.95);
+    height: 40px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.04);
+    color: #333;
     border: none;
-    color: var(--primary-color);
-    font-size: 0.9em;
+    font-size: 14px;
     font-weight: 500;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: var(--spacing-sm);
     cursor: pointer;
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: 12px;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.2s ease;
+    margin-bottom: var(--spacing-sm);
 }
 
 .quick-add-btn:hover {
-    background: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.06);
 }
 
 .quick-add-btn i {
@@ -901,23 +901,24 @@ body {
 }
 
 .modal-btn {
-    min-width: 100px;
     height: 40px;
+    min-width: 100px;
+    padding: var(--spacing-sm) var(--spacing-md);
     border: none;
     border-radius: 8px;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease;
 }
 
 .modal-btn.secondary {
-    background: #F5F5F7;
+    background: rgba(0, 0, 0, 0.04);
     color: #666;
 }
 
 .modal-btn.secondary:hover {
-    background: #EAEAEA;
+    background: rgba(0, 0, 0, 0.06);
 }
 
 .modal-btn.primary {
@@ -1066,20 +1067,22 @@ body {
     background: rgba(255, 59, 48, 0.1);
     color: var(--status-waiting);
     border: none;
+    height: 40px;
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: 8px;
     cursor: pointer;
-    font-size: 0.9em;
+    font-size: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: var(--spacing-sm);
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease;
+    margin-bottom: var(--spacing-sm);
+    min-width: 100px;
 }
 
 .danger-button:hover {
     background: rgba(255, 59, 48, 0.15);
-    transform: translateY(-1px);
 }
 
 .danger-button i {
@@ -1204,32 +1207,30 @@ body {
 /* Add queue button styles */
 .queue-action-container {
     display: flex;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
     margin-top: var(--spacing-md);
 }
 
 .add-to-queue-btn {
     flex: 1;
-    background: rgba(255, 255, 255, 0.95);
+    height: 40px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.04);
     border: none;
-    color: var(--primary-color);
-    font-size: 0.9em;
+    color: #333;
+    font-size: 14px;
     font-weight: 500;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: var(--spacing-sm);
     cursor: pointer;
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: 12px;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.2s ease;
 }
 
 .add-to-queue-btn:hover {
-    background: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.06);
 }
 
 /* Update court actions layout */
@@ -1251,28 +1252,30 @@ body {
 /* Consistent button styles */
 .court-button {
     width: 100%;
+    height: 40px;
     padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: 12px;
+    border-radius: 8px;
     border: none;
     background: rgba(0, 0, 0, 0.04);
     color: #333;
-    font-size: 0.9em;
+    font-size: 14px;
     font-weight: 500;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: var(--spacing-sm);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease;
+    margin-bottom: var(--spacing-sm);
 }
 
 .court-button:hover {
     background: rgba(0, 0, 0, 0.06);
-    transform: translateY(-1px);
 }
 
 .court-button i {
     color: #666;
+    font-size: 14px;
 }
 
 /* Queue section */
@@ -1440,23 +1443,25 @@ body {
 
 /* Secondary button style */
 .secondary-button {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.04);
     color: #333;
     border: none;
+    height: 40px;
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: 8px;
     cursor: pointer;
-    font-size: 0.9em;
+    font-size: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: var(--spacing-sm);
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease;
+    margin-bottom: var(--spacing-sm);
+    min-width: 100px;
 }
 
 .secondary-button:hover {
-    background: rgba(0, 0, 0, 0.08);
-    transform: translateY(-1px);
+    background: rgba(0, 0, 0, 0.06);
 }
 
 .secondary-button i {
