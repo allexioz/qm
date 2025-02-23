@@ -472,9 +472,7 @@ class GameManager {
             court.players.forEach(player => {
                 const oldStatus = player.status;
                 player.status = 'playing';
-                player.lastGameTime = Date.now();
-                player.gamesPlayed++;
-                console.log(`Player ${player.name}: ${oldStatus} -> ${player.status} (Games: ${player.gamesPlayed})`);
+                console.log(`Player ${player.name}: ${oldStatus} -> ${player.status}`);
             });
 
             console.log('Updated court state:', {
@@ -497,15 +495,25 @@ class GameManager {
     }
 
     getAvailablePlayers() {
-        return Array.from(this.players.values())
-            .filter(player => player.status === 'nogames' || player.status === 'waiting');
+        // Return all players without filtering by status
+        return Array.from(this.players.values());
     }
 
     importPlayers(namesText) {
-        console.log('👥 Importing players:', namesText);
+        console.group('👥 Importing players');
+        console.log('Raw input:', namesText);
+
         const playerNames = namesText
             .split('\n')
             .map(name => name.trim())
+            // Remove numbers and dots from the start (e.g., "1.", "12.", etc.)
+            .map(name => name.replace(/^\d+\.\s*/, ''))
+            // Capitalize first letter of each word
+            .map(name => name
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ')
+            )
             .filter(name => name.length > 0);
 
         console.log('Processed names:', playerNames);
@@ -657,10 +665,9 @@ class GameManager {
                         lastGameTime: playerObj.lastGameTime
                     });
 
-                    playerObj.gamesPlayed++;
-                    playerObj.lastGameTime = Date.now();
                     playerObj.status = 'resting';
-                    playerObj.courtId = null;
+                    playerObj.lastGameTime = Date.now();
+                    playerObj.gamesPlayed++;
 
                     console.log(`Player ${playerObj.name} after:`, {
                         status: playerObj.status,
@@ -1000,28 +1007,28 @@ class CourtView {
         let queueButton = '';
         let completeButton = '';
         
-        if (this.court.status === 'in_progress') {
-            completeButton = `
-                <button class="complete-game-btn">
-                    <i class="fas fa-flag-checkered"></i>
-                    Complete Game
-                </button>
-            `;
-        }
-        
         if (this.court.status === 'ready') {
             primaryButton = `
                 <button class="court-button start-game-btn">
-                    <i class="fas fa-play-circle"></i>
-                    <span>Start Game</span>
+                    <i class="fas fa-play"></i>
+                    Start Game
                 </button>
             `;
         } else if (this.court.status === 'empty' || this.court.players.length < 4) {
             const remainingSlots = 4 - this.court.players.length;
             primaryButton = `
                 <button class="court-button quick-add-btn">
-                    <i class="fas fa-plus-circle"></i>
-                    <span>Add ${remainingSlots} Player${remainingSlots === 1 ? '' : 's'}</span>
+                    <i class="fas fa-plus"></i>
+                    Add ${remainingSlots} Player${remainingSlots === 1 ? '' : 's'}
+                </button>
+            `;
+        }
+
+        if (this.court.status === 'in_progress') {
+            completeButton = `
+                <button class="court-button complete-game-btn">
+                    <i class="fas fa-flag"></i>
+                    Complete Game
                 </button>
             `;
         }
@@ -1031,7 +1038,7 @@ class CourtView {
             queueButton = `
                 <button class="court-button add-to-queue-btn">
                     <i class="fas fa-user-plus"></i>
-                    <span>Queue (${this.court.queue.length})</span>
+                    Queue
                 </button>
             `;
         }
@@ -1039,41 +1046,40 @@ class CourtView {
         return `
             <div class="court-actions">
                 ${primaryButton}
-            </div>
-            <div class="queue-action-container">
-                ${queueButton}
                 ${completeButton}
+                ${queueButton}
+                ${this.renderQueueSection()}
             </div>
-            ${this.renderQueueSection()}
         `;
     }
 
     renderQueueSection() {
         if (!this.court.queue.length) {
-            return `
-                <div class="queue-section">
-                    <div class="queue-header">Queue Empty</div>
-                </div>
-            `;
+            return '';
         }
 
         // Group players into matches of 4
         const matches = [];
         for (let i = 0; i < this.court.queue.length; i += 4) {
             const matchPlayers = this.court.queue.slice(i, i + 4);
+            // Only create a match if we have exactly 4 players
             if (matchPlayers.length === 4) {
                 matches.push({
-                    teamA: matchPlayers.slice(0, 2).map(p => p.name).join(' & '),
-                    teamB: matchPlayers.slice(2, 4).map(p => p.name).join(' & ')
+                    teamA: matchPlayers.slice(0, 2).map(p => p.name.split(' ')[0]).join(' & '),
+                    teamB: matchPlayers.slice(2, 4).map(p => p.name.split(' ')[0]).join(' & ')
                 });
             }
         }
 
+        // Only show up to 3 matches
+        const displayMatches = matches.slice(0, 3);
+        const remainingMatches = matches.length - 3;
+
         return `
             <div class="queue-section">
-                <div class="queue-header">In Queue (${matches.length} matches)</div>
+                <div class="queue-header">Next Up (${matches.length} ${matches.length === 1 ? 'match' : 'matches'})</div>
                 <div class="queue-list">
-                    ${matches.map((match, index) => `
+                    ${displayMatches.map((match, index) => `
                         <div class="queue-match">
                             <span class="match-number">${index + 1}</span>
                             <span class="team-a">${match.teamA}</span>
@@ -1081,6 +1087,11 @@ class CourtView {
                             <span class="team-b">${match.teamB}</span>
                         </div>
                     `).join('')}
+                    ${remainingMatches > 0 ? `
+                        <div class="queue-match" style="justify-content: center; color: #666;">
+                            +${remainingMatches} more ${remainingMatches === 1 ? 'match' : 'matches'}
+                        </div>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -1353,98 +1364,298 @@ class QuickAddModal {
     constructor(gameManager, eventBus) {
         this.gameManager = gameManager;
         this.eventBus = eventBus;
-        this.selectedPlayers = new Set();
-        this.currentCourt = null;
         this.element = document.getElementById('quickAddModal');
+        this.currentCourt = null;
+        this.selectedPlayers = new Set();
         this.initialize();
     }
 
     initialize() {
-        // Close button
-        this.element.querySelector('.close-btn').addEventListener('click', () => this.hide());
+        console.group('🎯 Initializing Quick Add Modal');
         
-        // Cancel button
-        document.getElementById('cancelQuickAdd').addEventListener('click', () => this.hide());
+        // Remove search input creation since it's in HTML
+        const modalBody = this.element.querySelector('.modal-body');
         
-        // Confirm button
-        document.getElementById('confirmQuickAdd').addEventListener('click', () => this.confirmSelection());
-        
-        // Player selection
-        document.getElementById('availablePlayersList').addEventListener('click', (e) => {
-            const playerChip = e.target.closest('.player-chip');
-            if (playerChip) this.togglePlayerSelection(playerChip);
+        // Add search functionality to existing search input
+        const searchInput = this.element.querySelector('#playerSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                console.log('🔍 Searching:', searchInput.value);
+                this.updateAvailablePlayers();
+            });
+        }
+
+        // Attach event listeners
+        const closeBtn = this.element.querySelector('.close-btn');
+        const cancelBtn = document.getElementById('cancelQuickAdd');
+        const confirmBtn = document.getElementById('confirmQuickAdd');
+        const playersList = document.getElementById('availablePlayersList');
+
+        if (closeBtn) closeBtn.addEventListener('click', () => this.hide());
+        if (cancelBtn) cancelBtn.addEventListener('click', () => this.hide());
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => {
+                console.group('✅ Confirm Quick Add');
+                try {
+                    this.confirmSelection();
+                } catch (error) {
+                    console.error('Failed to confirm selection:', error);
+                    Toast.show('Failed to add players', Toast.types.ERROR);
+                }
+                console.groupEnd();
+            });
+        }
+
+        if (playersList) {
+            playersList.addEventListener('click', (e) => {
+                const playerChip = e.target.closest('.player-chip');
+                if (playerChip) {
+                    const playerId = playerChip.dataset.playerId;
+                    console.log('Player chip clicked:', {
+                        playerId,
+                        isSelected: this.selectedPlayers.has(playerId)
+                    });
+                    this.togglePlayerSelection(playerChip);
+                }
+            });
+        }
+
+        // Add sort functionality
+        const sortBtns = this.element.querySelectorAll('.sort-btn');
+        sortBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                sortBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.sortPlayers(btn.dataset.sort);
+            });
         });
+
+        console.log('Event listeners attached');
+        console.groupEnd();
     }
 
     show(court) {
+        console.group('📱 Showing Quick Add Modal');
+        console.log('Court:', court);
+        
         this.currentCourt = court;
         this.selectedPlayers.clear();
         this.element.classList.add('active');
         this.updateAvailablePlayers();
         this.updateSelectedCount();
+        
+        console.log('Modal state after show:', {
+            isVisible: this.isVisible(),
+            currentCourt: this.currentCourt?.id,
+            selectedCount: this.selectedPlayers.size
+        });
+        console.groupEnd();
     }
 
     hide() {
+        console.log('🔒 Hiding Quick Add Modal');
         this.element.classList.remove('active');
-        this.selectedPlayers.clear();
         this.currentCourt = null;
-        this.updateSelectedCount();
+        this.selectedPlayers.clear();
     }
 
-    updateAvailablePlayers() {
-        const availablePlayers = this.gameManager.getAvailablePlayers();
-        const container = document.getElementById('availablePlayersList');
+    togglePlayerSelection(playerChip) {
+        console.group('🔄 Toggling player selection');
         
-        if (!availablePlayers.length) {
-            container.innerHTML = this.renderEmptyState();
-            return;
-        }
-
-        container.innerHTML = availablePlayers.map(player => this.renderPlayerChip(player)).join('');
-    }
-
-    renderPlayerChip(player) {
-        const isSelected = this.selectedPlayers.has(player.id);
-        return `
-            <div class="player-chip ${isSelected ? 'selected' : ''}" data-player-id="${player.id}">
-                <i class="fas fa-user-circle"></i>
-                <span>${player.name}</span>
-                ${isSelected ? '<i class="fas fa-check-circle check-icon"></i>' : ''}
-            </div>
-        `;
-    }
-
-    togglePlayerSelection(chipElement) {
-        const playerId = chipElement.dataset.playerId;
+        const playerId = playerChip.dataset.playerId;
         
         if (this.selectedPlayers.has(playerId)) {
             this.selectedPlayers.delete(playerId);
         } else if (this.selectedPlayers.size < 4) {
             this.selectedPlayers.add(playerId);
+        } else {
+            Toast.show('Maximum 4 players can be selected', Toast.types.WARNING);
+            return;
         }
 
+        this.updateUI();
+        
+        console.groupEnd();
+    }
+
+    updateUI() {
         this.updateAvailablePlayers();
         this.updateSelectedCount();
     }
 
     updateSelectedCount() {
-        const countElement = document.querySelector('.selected-players h4');
-        countElement.textContent = `Selected Players (${this.selectedPlayers.size}/4)`;
+        const countElement = this.element.querySelector('.selected-count');
+        const total = this.selectedPlayers.size;
+
+        if (total > 0) {
+            countElement.innerHTML = `
+                <div class="team-count">Selected Players (${total}/4)</div>
+            `;
+            countElement.classList.add('has-teams');
+        } else {
+            countElement.innerHTML = '<span>Selected Players (0/4)</span>';
+            countElement.classList.remove('has-teams');
+        }
+
+        if (total === 4) {
+            countElement.classList.add('full');
+        } else {
+            countElement.classList.remove('full');
+        }
     }
 
     confirmSelection() {
-        if (this.selectedPlayers.size > 0 && this.currentCourt) {
-            const playerIds = Array.from(this.selectedPlayers);
-            this.eventBus.emit('players:assigned', {
-                courtId: this.currentCourt.id,
-                playerIds
-            });
-            this.hide();
+        console.group('✅ Confirming player selection');
+        
+        if (this.selectedPlayers.size === 4 && this.currentCourt) {
+            try {
+                const playerIds = Array.from(this.selectedPlayers);
+                playerIds.forEach(playerId => {
+                    this.gameManager.assignPlayerToCourt(playerId, this.currentCourt.id);
+                });
+                this.hide();
+                Toast.show('Players added successfully', Toast.types.SUCCESS);
+            } catch (error) {
+                console.error('Failed to assign players:', error);
+                Toast.show('Failed to add players', Toast.types.ERROR);
+            }
+        } else {
+            console.warn('Invalid selection state');
+            Toast.show('Please select exactly 4 players', Toast.types.WARNING);
         }
+        console.groupEnd();
     }
 
     isVisible() {
         return this.element.classList.contains('active');
+    }
+
+    updateAvailablePlayers() {
+        console.group('📋 Updating Available Players List');
+        const container = document.getElementById('availablePlayersList');
+        const searchInput = this.element.querySelector('#playerSearchInput');
+        
+        if (!container) {
+            console.error('❌ Available players list container not found');
+            console.groupEnd();
+            return;
+        }
+
+        // Get all players
+        let allPlayers = Array.from(this.gameManager.players.values());
+        
+        // Apply search filter if there's a search term
+        const searchTerm = (searchInput?.value || '').toLowerCase();
+        if (searchTerm) {
+            allPlayers = allPlayers.filter(player => 
+                player.name.toLowerCase().includes(searchTerm)
+            );
+            console.log(`Filtered to ${allPlayers.length} players matching "${searchTerm}"`);
+        }
+
+        if (allPlayers.length === 0) {
+            container.innerHTML = this.renderEmptyState(searchTerm ? 'No matches found' : 'No players available');
+            console.groupEnd();
+            return;
+        }
+
+        // Get current sort criteria
+        const activeSortBtn = this.element.querySelector('.sort-btn.active');
+        const sortCriteria = activeSortBtn ? activeSortBtn.dataset.sort : 'name';
+        
+        // Sort players
+        this.sortPlayers(sortCriteria);
+
+        console.groupEnd();
+    }
+
+    renderPlayerChip(player) {
+        const isSelected = this.selectedPlayers.has(player.id);
+        const isFull = this.selectedPlayers.size >= 4;
+        const disabledClass = (!isSelected && isFull) ? 'disabled' : '';
+        
+        return `
+            <div class="player-chip ${isSelected ? 'selected' : ''} ${disabledClass}" 
+                 data-player-id="${player.id}">
+                <div class="player-info">
+                    <span class="player-name">${player.name}</span>
+                    <div class="player-stats">
+                        <span class="games-played">
+                            <i class="fas fa-trophy"></i>
+                            ${player.gamesPlayed} games
+                        </span>
+                        ${player.lastGameTime ? `
+                            <span class="last-game-time">
+                                <i class="fas fa-clock"></i>
+                                ${this.formatLastGameTime(player.lastGameTime)}
+                            </span>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="selection-indicator">
+                    ${isSelected ? 'Selected' : 'Select'}
+                </div>
+            </div>
+        `;
+    }
+
+    formatLastGameTime(timestamp) {
+        if (!timestamp) return null;
+        
+        const minutes = Math.floor((Date.now() - timestamp) / 60000);
+        
+        if (minutes < 60) {
+            return `${minutes}m ago`;
+        }
+        
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) {
+            return `${hours}h ago`;
+        }
+        
+        return `${Math.floor(hours / 24)}d ago`;
+    }
+
+    sortPlayers(criteria) {
+        console.group('🔄 Sorting Players');
+        console.log('Sort criteria:', criteria);
+        
+        let allPlayers = Array.from(this.gameManager.players.values());
+        
+        switch(criteria) {
+            case 'games':
+                allPlayers.sort((a, b) => b.gamesPlayed - a.gamesPlayed);
+                break;
+            case 'recent':
+                allPlayers.sort((a, b) => {
+                    if (!a.lastGameTime) return 1;
+                    if (!b.lastGameTime) return -1;
+                    return b.lastGameTime - a.lastGameTime;
+                });
+                break;
+            default: // 'name'
+                allPlayers.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        const container = document.getElementById('availablePlayersList');
+        if (container) {
+            container.innerHTML = allPlayers
+                .map(player => this.renderPlayerChip(player))
+                .join('');
+        }
+        
+        console.log('Players sorted:', allPlayers.length);
+        console.groupEnd();
+    }
+
+    renderEmptyState(message) {
+        return `
+            <div class="empty-state">
+                <i class="fas fa-users-slash"></i>
+                <p>${message}</p>
+                <span>Add players first using the import feature</span>
+            </div>
+        `;
     }
 }
 
@@ -1459,83 +1670,78 @@ class PlayerListView {
     initialize() {
         console.group('🎯 Initializing PlayerListView');
         
-        // Get DOM elements
-        const importButton = document.getElementById('importButton');
-        const importTextarea = document.getElementById('playerImport');
-        const resetButton = document.getElementById('resetButton');
+        // Get DOM elements for both desktop and mobile
+        const importButtons = ['importButton', 'mobileImportButton'];
+        const importTextareas = ['playerImport', 'mobilePlayerImport'];
+        const resetButtons = ['resetButton', 'mobileResetButton'];
 
-        if (!importButton || !importTextarea) {
-            console.error('❌ Import elements not found', {
-                importButton: !!importButton,
-                importTextarea: !!importTextarea
-            });
-            console.groupEnd();
-            return;
-        }
-        console.log('✅ All required elements found');
-
-        // Add import handler
-        importButton.addEventListener('click', () => {
-            console.group('📝 Import Button Clicked');
-            const namesText = importTextarea.value.trim();
-            console.log('Raw input:', namesText);
+        // Add import handlers
+        importButtons.forEach((btnId, index) => {
+            const button = document.getElementById(btnId);
+            const textarea = document.getElementById(importTextareas[index]);
             
-            if (!namesText) {
-                console.warn('Empty input detected');
-                Toast.show('Please enter player names', Toast.types.ERROR);
-                console.groupEnd();
-                return;
-            }
+            if (button && textarea) {
+                button.addEventListener('click', () => {
+                    console.group('📝 Import Button Clicked');
+                    const namesText = textarea.value.trim();
+                    
+                    if (!namesText) {
+                        Toast.show('Please enter player names', Toast.types.ERROR);
+                        return;
+                    }
 
-            try {
-                const result = this.gameManager.importPlayers(namesText);
-                console.log('Import successful, players added:', result);
-                importTextarea.value = '';
-            } catch (error) {
-                console.error('Import failed:', error);
-                Toast.show(error.message, Toast.types.ERROR);
+                    try {
+                        const result = this.gameManager.importPlayers(namesText);
+                        textarea.value = '';
+                    } catch (error) {
+                        Toast.show(error.message, Toast.types.ERROR);
+                    }
+                });
             }
-            console.groupEnd();
         });
 
-        // Add reset handler
-        resetButton?.addEventListener('click', () => {
-            if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
-                this.gameManager.resetAllData();
-                Toast.show('All data has been reset', Toast.types.INFO);
+        // Add reset handlers
+        resetButtons.forEach(btnId => {
+            const button = document.getElementById(btnId);
+            if (button) {
+                button.addEventListener('click', () => {
+                    if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+                        this.gameManager.resetAllData();
+                        Toast.show('All data has been reset', Toast.types.INFO);
+                    }
+                });
             }
         });
 
         // Initial render
         this.updatePlayersList();
-        console.log('Event listeners attached');
         console.groupEnd();
     }
 
     updatePlayersList() {
         console.group('🔄 Updating Players List');
-        const playersList = document.getElementById('playersList');
-        if (!playersList) {
-            console.error('Players list element not found');
-            console.groupEnd();
-            return;
-        }
-
-        const players = Array.from(this.gameManager.players.values());
-        console.log('Players to render:', players);
-
-        if (players.length === 0) {
-            console.log('Rendering empty state');
-            playersList.innerHTML = this.renderEmptyState();
-        } else {
-            console.log('Rendering player items');
-            const sortedPlayers = players.sort((a, b) => a.name.localeCompare(b.name));
-            playersList.innerHTML = sortedPlayers
-                .map(player => this.renderPlayerItem(player))
-                .join('');
-        }
         
-        console.log('Players list updated');
+        // Update both desktop and mobile lists
+        const listsToUpdate = [
+            document.getElementById('playersList'),
+            document.querySelector('.mobile-players-list')
+        ];
+
+        listsToUpdate.forEach(list => {
+            if (!list) return;
+
+            const players = Array.from(this.gameManager.players.values());
+            
+            if (players.length === 0) {
+                list.innerHTML = this.renderEmptyState();
+            } else {
+                const sortedPlayers = players.sort((a, b) => a.name.localeCompare(b.name));
+                list.innerHTML = sortedPlayers
+                    .map(player => this.renderPlayerItem(player))
+                    .join('');
+            }
+        });
+
         console.groupEnd();
     }
 
@@ -1550,41 +1756,122 @@ class PlayerListView {
     }
 
     renderPlayerItem(player) {
+        const statuses = this.getPlayerStatuses(player);
+        
         return `
-            <div class="player-item">
+            <div class="player-item" data-player-id="${player.id}">
                 <div class="player-info">
-                    <i class="fas fa-user"></i>
-                    <span>${player.name}</span>
+                    <span class="player-name">${player.name}</span>
+                    <div class="player-stats">
+                        <span class="games-played" title="Games Played">
+                            <i class="fas fa-trophy"></i>
+                            ${player.gamesPlayed}
+                        </span>
+                        ${player.lastGameTime ? `
+                            <span class="last-game" title="Last Game">
+                                <i class="fas fa-clock"></i>
+                                ${this.formatLastGameTime(player.lastGameTime)}
+                            </span>
+                        ` : ''}
+                    </div>
                 </div>
-                <div class="status-chip ${player.status}">
-                    <i class="fas ${this.getStatusIcon(player.status)}"></i>
-                    <span>${this.getStatusLabel(player.status)}</span>
+                <div class="player-statuses">
+                    ${statuses.map(status => `
+                        <span class="status-badge ${status.class}">
+                            <i class="fas ${status.icon}"></i>
+                            ${status.label}
+                        </span>
+                    `).join('')}
                 </div>
             </div>
         `;
     }
 
-    getStatusIcon(status) {
-        const icons = {
-            playing: 'fa-table-tennis-paddle-ball',
-            queued: 'fa-clock',
-            resting: 'fa-couch',
-            waiting: 'fa-hand',
-            nogames: 'fa-circle-minus'
-        };
-        return icons[status] || icons.nogames;
+    getPlayerStatuses(player) {
+        const statuses = [];
+        
+        // Check if currently playing
+        if (player.status === 'playing') {
+            statuses.push({
+                label: 'Playing',
+                icon: 'fa-table-tennis-paddle-ball',
+                class: 'playing'
+            });
+        }
+
+        // Check if in any queue
+        const isQueued = Array.from(this.gameManager.courts.values())
+            .some(court => court.queue.some(p => p.id === player.id));
+        if (isQueued) {
+            statuses.push({
+                label: 'Queued',
+                icon: 'fa-clock',
+                class: 'queued'
+            });
+        }
+
+        // Check if resting (played recently and not playing or queued)
+        const restingThreshold = 10 * 60 * 1000; // 10 minutes in milliseconds
+        const isResting = player.lastGameTime && 
+                         (Date.now() - player.lastGameTime) < restingThreshold && 
+                         !isQueued && 
+                         player.status !== 'playing';
+        
+        if (isResting) {
+            statuses.push({
+                label: 'Resting',
+                icon: 'fa-couch',
+                class: 'resting'
+            });
+        }
+
+        // Default status if no other status applies
+        if (statuses.length === 0) {
+            statuses.push({
+                label: player.gamesPlayed > 0 ? 'Available' : 'No Games Yet',
+                icon: player.gamesPlayed > 0 ? 'fa-check' : 'fa-circle-minus',
+                class: player.gamesPlayed > 0 ? 'available' : 'nogames'
+            });
+        }
+
+        return statuses;
     }
 
-    getStatusLabel(status) {
-        const labels = {
-            playing: 'Playing',
-            queued: 'Queued',
-            resting: 'Resting',
-            waiting: 'Waiting',
-            nogames: 'No Games Yet'
-        };
-        return labels[status] || labels.nogames;
+    formatLastGameTime(timestamp) {
+        const minutes = Math.floor((Date.now() - timestamp) / 60000);
+        if (minutes < 60) {
+            return `${minutes}m ago`;
+        }
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) {
+            return `${hours}h ago`;
+        }
+        return `${Math.floor(hours / 24)}d ago`;
     }
+}
+
+// Helper function to format the last game time
+function formatLastGameTime(timestamp) {
+    const minutes = Math.floor((Date.now() - timestamp) / 60000);
+    if (minutes < 60) {
+        return `${minutes}m ago`;
+    }
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) {
+        return `${hours}h ago`;
+    }
+    return `${Math.floor(hours / 24)}d ago`;
+}
+
+// Helper function to format player status
+function formatPlayerStatus(status) {
+    const statusMap = {
+        'nogames': '⚪ No Games',
+        'waiting': '🔄 Waiting',
+        'playing': '🎯 Playing',
+        'resting': '💤 Resting'
+    };
+    return statusMap[status] || status;
 }
 
 // Also add back the Toast class
@@ -1647,13 +1934,9 @@ class QueueModal {
     constructor(gameManager, eventBus) {
         this.gameManager = gameManager;
         this.eventBus = eventBus;
-        this.selectedPlayers = {
-            teamA: new Set(),
-            teamB: new Set()
-        };
-        this.currentTeam = 'teamA'; // Which team we're currently selecting for
-        this.currentCourt = null;
         this.element = document.getElementById('queueModal');
+        this.selectedPlayers = new Set();
+        this.currentCourt = null;
         this.initialize();
     }
 
@@ -1668,122 +1951,129 @@ class QueueModal {
         document.getElementById('confirmQueue').addEventListener('click', () => this.confirmSelection());
         
         // Player selection
-        document.getElementById('queuePlayersList').addEventListener('click', (e) => {
+        const playersList = document.getElementById('queuePlayersList');
+        playersList.addEventListener('click', (e) => {
             const playerChip = e.target.closest('.player-chip');
-            if (playerChip) this.togglePlayerSelection(playerChip);
+            if (playerChip) {
+                this.togglePlayerSelection(playerChip);
+            }
         });
 
-        // Add team toggle
-        const teamToggle = this.element.querySelector('.team-toggle');
-        if (teamToggle) {
-            teamToggle.addEventListener('click', () => {
-                this.currentTeam = this.currentTeam === 'teamA' ? 'teamB' : 'teamA';
-                this.updateUI();
+        // Search functionality
+        const searchInput = document.getElementById('queueSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.filterPlayers(e.target.value);
             });
         }
+
+        // Sort buttons
+        const sortBtns = this.element.querySelectorAll('.sort-btn');
+        sortBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                sortBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.sortPlayers(btn.dataset.sort);
+            });
+        });
     }
 
     show(court) {
         this.currentCourt = court;
-        this.selectedPlayers.teamA.clear();
-        this.selectedPlayers.teamB.clear();
+        this.selectedPlayers.clear();
         this.element.classList.add('active');
-        this.updateUI();
+        
+        // Initial render with all players sorted by name
+        this.sortPlayers('name');
     }
 
     hide() {
         this.element.classList.remove('active');
-        this.selectedPlayers.teamA.clear();
-        this.selectedPlayers.teamB.clear();
+        this.selectedPlayers.clear();
         this.currentCourt = null;
-        this.updateSelectedCount();
     }
 
-    getTotalSelectedPlayers() {
-        return this.selectedPlayers.teamA.size + this.selectedPlayers.teamB.size;
-    }
-
-    getTeamLabel(team) {
-        const players = Array.from(this.selectedPlayers[team])
-            .map(id => this.gameManager.players.get(id).name);
-        return players.join(' & ');
-    }
-
-    getMatchupLabel() {
-        if (this.getTotalSelectedPlayers() !== 4) return '';
-        return `${this.getTeamLabel('teamA')} vs ${this.getTeamLabel('teamB')}`;
+    updateSelectedCount() {
+        const countElement = this.element.querySelector('.selected-count');
+        if (countElement) {
+            const total = this.selectedPlayers.size;
+            countElement.innerHTML = `<span>Selected Players (${total}/4)</span>`;
+            countElement.classList.toggle('full', total === 4);
+        }
     }
 
     togglePlayerSelection(chipElement) {
         const playerId = chipElement.dataset.playerId;
-        const currentTeam = this.currentTeam;
-        const otherTeam = currentTeam === 'teamA' ? 'teamB' : 'teamA';
         
-        // Remove from other team if present
-        this.selectedPlayers[otherTeam].delete(playerId);
-        
-        // Toggle in current team
-        if (this.selectedPlayers[currentTeam].has(playerId)) {
-            this.selectedPlayers[currentTeam].delete(playerId);
-        } else if (this.selectedPlayers[currentTeam].size < 2) {
-            this.selectedPlayers[currentTeam].add(playerId);
-            // Auto-switch to other team if current team is full
-            if (this.selectedPlayers[currentTeam].size === 2) {
-                this.currentTeam = otherTeam;
-            }
+        if (this.selectedPlayers.has(playerId)) {
+            this.selectedPlayers.delete(playerId);
+        } else if (this.selectedPlayers.size < 4) {
+            this.selectedPlayers.add(playerId);
+        } else {
+            Toast.show('Maximum 4 players can be selected', Toast.types.WARNING);
+            return;
         }
 
         this.updateUI();
     }
 
     updateUI() {
-        this.updateAvailablePlayers();
+        // Update available players list
+        this.sortPlayers('name');
+
+        // Update selected count
         this.updateSelectedCount();
-        this.updateTeamDisplay();
     }
 
-    updateSelectedCount() {
-        const countElement = this.element.querySelector('.queue-selected-players h4');
-        const matchupElement = this.element.querySelector('.matchup-preview');
-        
-        if (this.getTotalSelectedPlayers() === 4) {
-            countElement.textContent = 'Match Ready';
-            matchupElement.textContent = this.getMatchupLabel();
-            matchupElement.classList.add('ready');
-        } else {
-            countElement.textContent = `Selected Players (${this.getTotalSelectedPlayers()}/4)`;
-            matchupElement.textContent = 'Select players for both teams';
-            matchupElement.classList.remove('ready');
-        }
-    }
-
-    updateAvailablePlayers() {
-        const availablePlayers = this.gameManager.getQueueablePlayers();
+    renderPlayers(players) {
         const container = document.getElementById('queuePlayersList');
-        
-        if (!availablePlayers.length) {
+        if (!container) return;
+
+        if (players.length === 0) {
             container.innerHTML = this.renderEmptyState();
             return;
         }
 
-        container.innerHTML = availablePlayers
-            .sort((a, b) => a.name.localeCompare(b.name))
+        container.innerHTML = players
             .map(player => this.renderPlayerChip(player))
             .join('');
     }
 
     renderPlayerChip(player) {
-        const inTeamA = this.selectedPlayers.teamA.has(player.id);
-        const inTeamB = this.selectedPlayers.teamB.has(player.id);
-        const isSelected = inTeamA || inTeamB;
-        const teamClass = inTeamA ? 'team-a' : (inTeamB ? 'team-b' : '');
+        const isSelected = this.selectedPlayers.has(player.id);
+        const isFull = this.selectedPlayers.size >= 4;
+        const disabledClass = (!isSelected && isFull) ? 'disabled' : '';
+        
+        const statusLabel = player.status === 'playing' ? '🎮 In Game' : 
+                          player.status === 'queued' ? '⏳ In Queue' : '';
         
         return `
-            <div class="player-chip ${isSelected ? 'selected' : ''} ${teamClass}" 
+            <div class="player-chip ${isSelected ? 'selected' : ''} ${disabledClass}" 
                  data-player-id="${player.id}">
-                    <span>${player.name}</span>
-                ${isSelected ? `<span class="team-indicator">${inTeamA ? 'A' : 'B'}</span>` : ''}
+                <div class="player-info">
+                    <span class="player-name">${player.name}</span>
+                    <div class="player-stats">
+                        <span class="games-played">
+                            <i class="fas fa-trophy"></i>
+                            ${player.gamesPlayed} games
+                        </span>
+                        ${player.lastGameTime ? `
+                            <span class="last-game-time">
+                                <i class="fas fa-clock"></i>
+                                ${this.formatLastGameTime(player.lastGameTime)}
+                            </span>
+                        ` : ''}
+                        ${statusLabel ? `
+                            <span class="player-current-status">
+                                ${statusLabel}
+                            </span>
+                        ` : ''}
+                    </div>
                 </div>
+                <div class="selection-indicator">
+                    ${isSelected ? 'Selected' : 'Select'}
+                </div>
+            </div>
         `;
     }
 
@@ -1791,26 +2081,68 @@ class QueueModal {
         return `
             <div class="empty-state">
                 <i class="fas fa-users-slash"></i>
-                <p>No Available Players</p>
-                <span>All players are currently in games or queues</span>
-                </div>
-            `;
+                <p>No players found</p>
+                <span>Try adjusting your search</span>
+            </div>
+        `;
     }
 
     confirmSelection() {
-        if (this.getTotalSelectedPlayers() > 0 && this.currentCourt) {
-            const playerIds = Array.from(this.selectedPlayers[this.currentTeam]);
+        if (this.selectedPlayers.size === 4 && this.currentCourt) {
+            const playerIds = Array.from(this.selectedPlayers);
             this.gameManager.addToQueue(this.currentCourt.id, playerIds);
+            Toast.show('Players added to queue', Toast.types.SUCCESS);
             this.hide();
+        } else {
+            Toast.show('Please select exactly 4 players', Toast.types.WARNING);
         }
     }
 
-    isVisible() {
-        return this.element.classList.contains('active');
+    sortPlayers(criteria) {
+        let allPlayers = Array.from(this.gameManager.players.values());
+        
+        switch(criteria) {
+            case 'games':
+                allPlayers.sort((a, b) => b.gamesPlayed - a.gamesPlayed);
+                break;
+            case 'recent':
+                allPlayers.sort((a, b) => {
+                    if (!a.lastGameTime) return 1;
+                    if (!b.lastGameTime) return -1;
+                    return b.lastGameTime - a.lastGameTime;
+                });
+                break;
+            default: // 'name'
+                allPlayers.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        this.renderPlayers(allPlayers);
     }
 
-    updateTeamDisplay() {
-        // Implementation of updateTeamDisplay method
+    filterPlayers(searchTerm) {
+        const players = Array.from(this.gameManager.players.values());
+        const filtered = players.filter(player => 
+            player.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        
+        this.renderPlayers(filtered);
+    }
+
+    formatLastGameTime(timestamp) {
+        if (!timestamp) return null;
+        
+        const minutes = Math.floor((Date.now() - timestamp) / 60000);
+        
+        if (minutes < 60) {
+            return `${minutes}m ago`;
+        }
+        
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) {
+            return `${hours}h ago`;
+        }
+        
+        return `${Math.floor(hours / 24)}d ago`;
     }
 }
 

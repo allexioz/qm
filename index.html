@@ -52,15 +52,15 @@
                     <h2>Players List 🏸</h2>
                 </div>
                 <div class="import-section">
-                    <textarea id="playerImport" placeholder="Enter player names (one per line)"></textarea>
-                    <button id="importButton" class="secondary-button">
+                    <textarea id="mobilePlayerImport" placeholder="Enter player names (one per line)"></textarea>
+                    <button id="mobileImportButton" class="secondary-button">
                         <i class="fas fa-file-import"></i> Import Players
                     </button>
-                    <button id="resetButton" class="danger-button">
+                    <button id="mobileResetButton" class="danger-button">
                         <i class="fas fa-trash-alt"></i> Reset All Data
                     </button>
                 </div>
-                <div class="players-list" id="playersList">
+                <div class="mobile-players-list">
                     <!-- Players will be dynamically added here -->
                 </div>
             </div>
@@ -70,30 +70,36 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Quick Add Players</h3>
-                <button class="close-btn">
-                    <i class="fas fa-times"></i>
-                </button>
+                <button class="close-btn">×</button>
             </div>
             <div class="modal-body">
-                <div class="available-players">
-                    <h4>Available Players</h4>
+                <div class="players-section">
+                    <div class="section-header">
+                        <h4>Available Players</h4>
+                        <div class="sort-options">
+                            <button class="sort-btn active" data-sort="name">Name</button>
+                            <button class="sort-btn" data-sort="games">Games</button>
+                            <button class="sort-btn" data-sort="recent">Recent</button>
+                        </div>
+                    </div>
+                    <div class="search-container">
+                        <input type="text" 
+                               id="playerSearchInput" 
+                               placeholder="Search players..." 
+                               class="player-search-input"
+                               autocomplete="off">
+                    </div>
                     <div class="players-grid" id="availablePlayersList">
-                        <!-- Available players will be added here -->
+                        <!-- Players will be added here -->
                     </div>
                 </div>
-                <div class="selected-players">
-                    <h4>Selected Players (0/4)</h4>
-                    <div class="players-grid" id="selectedPlayersList">
-                        <!-- Selected players will appear here -->
-                    </div>
+                <div class="selected-count">
+                    <span>Selected Players (0/4)</span>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="secondary-button" id="cancelQuickAdd">Cancel</button>
-                <button class="primary-button" id="confirmQuickAdd">
-                    <i class="fas fa-check"></i>
-                    Assign Players
-                </button>
+                <button class="modal-btn secondary" id="cancelQuickAdd">Cancel</button>
+                <button class="modal-btn primary" id="confirmQuickAdd">Assign</button>
             </div>
         </div>
     </div>
@@ -101,19 +107,36 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Add to Queue</h3>
-                <button class="close-btn"><i class="fas fa-times"></i></button>
+                <button class="close-btn">×</button>
             </div>
             <div class="modal-body">
-                <div class="queue-selected-players">
-                    <h4>Selected Players (0)</h4>
+                <div class="players-section">
+                    <div class="section-header">
+                        <h4>Available Players</h4>
+                        <div class="sort-options">
+                            <button class="sort-btn active" data-sort="name">Name</button>
+                            <button class="sort-btn" data-sort="games">Games</button>
+                            <button class="sort-btn" data-sort="recent">Recent</button>
+                        </div>
+                    </div>
+                    <div class="search-container">
+                        <input type="text" 
+                               id="queueSearchInput" 
+                               placeholder="Search players..." 
+                               class="player-search-input"
+                               autocomplete="off">
+                    </div>
+                    <div class="players-grid" id="queuePlayersList">
+                        <!-- Players will be added here -->
+                    </div>
                 </div>
-                <div id="queuePlayersList" class="players-grid">
-                    <!-- Players will be inserted here -->
+                <div class="selected-count">
+                    <span>Selected Players (0/4)</span>
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="cancelQueue" class="secondary-button">Cancel</button>
-                <button id="confirmQueue" class="primary-button">Add to Queue</button>
+                <button class="modal-btn secondary" id="cancelQueue">Cancel</button>
+                <button class="modal-btn primary" id="confirmQueue">Queue</button>
             </div>
         </div>
     </div>
