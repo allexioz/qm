@@ -18,6 +18,7 @@ class Court {
         this.startTime = null;
         this.queue = [];       // players waiting for this court
         this.timerId = null;   // for tracking the timer interval
+        this.startedFromQueue = false;
     }
 
     // Add method to handle serialization for localStorage
@@ -137,6 +138,27 @@ class Court {
 
         console.groupEnd();
         return { minutes, seconds };
+    }
+
+    completeGame() {
+        // Stop any existing timer
+        if (this.timerId) {
+            clearInterval(this.timerId);
+            this.timerId = null;
+        }
+
+        // Move next players from queue if available
+        if (this.queue.length >= 4) {
+            const nextPlayers = this.queue.splice(0, 4);
+            this.players = nextPlayers;
+            this.status = 'ready';
+        } else {
+            this.players = [];
+            this.status = 'empty';
+        }
+        
+        this.startTime = null;
+        this.startedFromQueue = false;
     }
 }
 
@@ -439,53 +461,29 @@ class GameManager {
 
     startGame(courtId) {
         console.group('🎮 Starting Game Process');
-        console.log('Attempting to start game for court:', courtId);
         
         const court = this.courts.get(courtId);
-        
         if (!court) {
             console.error('❌ Court not found:', courtId);
             console.groupEnd();
             return;
         }
 
-        console.log('Current court state:', {
-            id: court.id,
-            status: court.status,
-            players: court.players,
-            queue: court.queue
-        });
-
-        if (court.players.length !== 4) {
-            console.warn('⚠️ Not enough players:', court.players.length);
-            Toast.show('Need 4 players to start a game', Toast.types.ERROR);
-            console.groupEnd();
-            return;
-        }
-
         try {
-            console.log('Starting game...');
             court.startGame();
             
-            // Update player statuses
-            console.log('Updating player statuses...');
+            // Update player statuses and increment games count for Quick Add
             court.players.forEach(player => {
                 const oldStatus = player.status;
                 player.status = 'playing';
-                console.log(`Player ${player.name}: ${oldStatus} -> ${player.status}`);
-            });
-
-            console.log('Updated court state:', {
-                status: court.status,
-                startTime: court.startTime,
-                players: court.players.map(p => ({ name: p.name, status: p.status }))
+                player.gamesPlayed++; // Increment games count when starting via Quick Add
+                player.lastGameTime = Date.now();
+                console.log(`Player ${player.name}: ${oldStatus} -> ${player.status} (Games: ${player.gamesPlayed})`);
             });
 
             Toast.show('Game started!', Toast.types.SUCCESS);
             this.eventBus.emit('game:started', court);
             this.saveState();
-            
-            console.log('✅ Game started successfully');
         } catch (error) {
             console.error('❌ Failed to start game:', error);
             Toast.show('Failed to start game', Toast.types.ERROR);
@@ -627,111 +625,51 @@ class GameManager {
 
     completeGame(courtId) {
         console.group('🏁 Complete Game Flow');
-        console.time('completeGame');
         
         try {
             const court = this.courts.get(courtId);
-            console.log('Court state before completion:', {
-                id: court.id,
-                status: court.status,
-                players: court.players.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    status: p.status,
-                    gamesPlayed: p.gamesPlayed
-                })),
-                queue: court.queue.length,
-                startTime: court.startTime
-            });
+            if (!court) throw new Error(`Court ${courtId} not found`);
 
-            if (!court) {
-                console.error('❌ Court not found:', courtId);
-                throw new Error(`Court ${courtId} not found`);
+            // For games started from queue, increment the count here
+            if (court.startedFromQueue) {
+                court.players.forEach(player => {
+                    const playerObj = this.players.get(player.id);
+                    if (playerObj) {
+                        playerObj.gamesPlayed++;
+                    }
+                });
             }
 
-            if (court.status !== 'in_progress') {
-                console.warn('⚠️ Invalid court status:', court.status);
-                throw new Error(`Cannot complete game - court status is ${court.status}`);
-            }
-
-            // Update player stats and status
-            console.group('📊 Updating Players');
+            // Update player statuses
             court.players.forEach(player => {
                 const playerObj = this.players.get(player.id);
                 if (playerObj) {
-                    console.log(`Player ${playerObj.name} before:`, {
-                        status: playerObj.status,
-                        gamesPlayed: playerObj.gamesPlayed,
-                        lastGameTime: playerObj.lastGameTime
-                    });
-
                     playerObj.status = 'resting';
                     playerObj.lastGameTime = Date.now();
-                    playerObj.gamesPlayed++;
-
-                    console.log(`Player ${playerObj.name} after:`, {
-                        status: playerObj.status,
-                        gamesPlayed: playerObj.gamesPlayed,
-                        lastGameTime: playerObj.lastGameTime
-                    });
-                } else {
-                    console.warn('⚠️ Player not found in registry:', player.id);
                 }
             });
-            console.groupEnd();
 
-            // Handle queue and next game setup
-            console.group('🔄 Queue Management');
-            console.log('Current queue length:', court.queue.length);
+            // Clear the court and handle queue
+            court.completeGame();
             
-            if (court.queue.length >= 4) {
-                console.log('Setting up next game from queue');
-                const nextPlayers = court.queue.splice(0, 4);
-                console.log('Next players:', nextPlayers.map(id => {
-                    const player = this.players.get(id);
-                    return player ? player.name : 'Unknown';
-                }));
-
-                nextPlayers.forEach(playerId => {
-                    const player = this.players.get(playerId);
-                    if (player) {
-                        player.status = 'playing';
-                        player.courtId = courtId;
-                        court.players.push(player);
-                        console.log(`Added ${player.name} to next game`);
-                    }
-                });
-                court.status = 'ready';
-            } else {
-                console.log('Not enough players in queue for next game');
-                court.status = 'empty';
-                court.players = [];
+            // Stop the timer
+            if (court.timerId) {
+                clearInterval(court.timerId);
+                court.timerId = null;
             }
-            console.groupEnd();
 
-            // Final state logging
-            console.group('📝 Final State');
-            console.log('Court after completion:', {
-                status: court.status,
-                players: court.players.length,
-                queue: court.queue.length
-            });
-            console.groupEnd();
-
+            // Save state and emit events
             this.saveState();
+            this.eventBus.emit('game:completed', court);
             this.eventBus.emit('court:updated', court);
             this.eventBus.emit('players:updated');
 
-            console.timeEnd('completeGame');
-            console.groupEnd();
-            return true;
-
         } catch (error) {
-            console.error('❌ Game completion failed:', error);
-            console.timeEnd('completeGame');
-            console.groupEnd();
-            throw error;
+            console.error('❌ Error completing game:', error);
+            Toast.show('Failed to complete game', Toast.types.ERROR);
         }
+        
+        console.groupEnd();
     }
 
     initializeCourtViews() {
@@ -1228,6 +1166,14 @@ class CourtView {
             
             console.log('✅ Complete game button listener attached');
         }
+
+        // Listen for game completed event
+        this.eventBus.on('game:completed', (court) => {
+            if (court.id === this.court.id) {
+                this.stopGameTimer();
+                this.render(); // Re-render the entire court view
+            }
+        });
     }
 
     getStatusText() {
