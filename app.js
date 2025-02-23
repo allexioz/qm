@@ -175,29 +175,158 @@ class EventBus {
 }
 
 class LocalStorage {
-    save(state) {
-        console.group('💾 LocalStorage Save');
-        console.log('Saving state:', state);
+    constructor() {
+        this.storageKey = 'gameState';
+        console.log('📦 Initializing LocalStorage with key:', this.storageKey);
+        this.validateStorage();
+    }
+
+    validateStorage() {
+        console.group('🔍 Validating LocalStorage');
         try {
-            localStorage.setItem('gameState', JSON.stringify(state));
-            console.log('✅ State saved successfully');
+            localStorage.setItem('test', 'test');
+            localStorage.removeItem('test');
+            console.log('✅ LocalStorage is available and working');
+            console.groupEnd();
         } catch (error) {
-            console.error('Failed to save state:', error);
+            console.error('❌ LocalStorage validation failed:', error);
+            console.groupEnd();
+            throw new Error('LocalStorage is not available');
         }
-        console.groupEnd();
+    }
+
+    save(state) {
+        console.group('💾 Saving to LocalStorage');
+        try {
+            // Validate state object
+            if (!state || typeof state !== 'object') {
+                throw new Error('Invalid state object');
+            }
+
+            console.log('📝 State to save:', {
+                players: state.players.length,
+                courts: Object.keys(state.courts).length,
+                timestamp: new Date().toISOString()
+            });
+
+            const serializedState = JSON.stringify(state);
+            localStorage.setItem(this.storageKey, serializedState);
+            
+            console.log('✅ State saved successfully');
+            console.groupEnd();
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to save state:', error);
+            console.groupEnd();
+            throw new Error(`Failed to save state: ${error.message}`);
+        }
     }
 
     load() {
-        console.group('📂 LocalStorage Load');
+        console.group('📂 Loading from LocalStorage');
         try {
-            const state = JSON.parse(localStorage.getItem('gameState')) || { players: [], courts: {} };
-            console.log('Loaded state:', state);
+            const serializedState = localStorage.getItem(this.storageKey);
+            
+            if (!serializedState) {
+                console.log('ℹ️ No existing state found, returning default state');
+                console.groupEnd();
+                return this.getDefaultState();
+            }
+
+            const state = JSON.parse(serializedState);
+            
+            console.log('📊 Loaded state:', {
+                players: state.players.length,
+                courts: Object.keys(state.courts).length,
+                timestamp: new Date().toISOString()
+            });
+
+            // Validate loaded state
+            if (!this.isValidState(state)) {
+                console.warn('⚠️ Invalid state structure detected, returning default state');
+                console.groupEnd();
+                return this.getDefaultState();
+            }
+
+            console.log('✅ State loaded successfully');
             console.groupEnd();
             return state;
         } catch (error) {
-            console.error('Failed to load state:', error);
+            console.error('❌ Failed to load state:', error);
             console.groupEnd();
-            return { players: [], courts: {} };
+            return this.getDefaultState();
+        }
+    }
+
+    clear() {
+        console.group('🧹 Clearing LocalStorage');
+        try {
+            localStorage.removeItem(this.storageKey);
+            console.log('✅ Storage cleared successfully');
+            console.groupEnd();
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to clear storage:', error);
+            console.groupEnd();
+            throw new Error(`Failed to clear storage: ${error.message}`);
+        }
+    }
+
+    isValidState(state) {
+        console.group('🔍 Validating State Structure');
+        
+        const isValid = state &&
+            typeof state === 'object' &&
+            Array.isArray(state.players) &&
+            typeof state.courts === 'object';
+
+        if (!isValid) {
+            console.log('❌ State validation failed');
+            console.log('Expected structure:', {
+                players: 'Array',
+                courts: 'Object'
+            });
+            console.log('Received:', {
+                players: state?.players ? typeof state.players : 'undefined',
+                courts: state?.courts ? typeof state.courts : 'undefined'
+            });
+        } else {
+            console.log('✅ State structure is valid');
+        }
+
+        console.groupEnd();
+        return isValid;
+    }
+
+    getDefaultState() {
+        console.log('📋 Creating default state');
+        return {
+            players: [],
+            courts: {}
+        };
+    }
+
+    getStorageStats() {
+        console.group('📊 LocalStorage Stats');
+        try {
+            const total = localStorage.length;
+            const used = new Blob([JSON.stringify(localStorage)]).size;
+            const remaining = 5 * 1024 * 1024 - used; // 5MB is typical limit
+
+            const stats = {
+                totalItems: total,
+                usedSpace: `${(used / 1024).toFixed(2)}KB`,
+                remainingSpace: `${(remaining / 1024).toFixed(2)}KB`,
+                timestamp: new Date().toISOString()
+            };
+
+            console.table(stats);
+            console.groupEnd();
+            return stats;
+        } catch (error) {
+            console.error('❌ Failed to get storage stats:', error);
+            console.groupEnd();
+            return null;
         }
     }
 }
@@ -487,6 +616,125 @@ class GameManager {
                 player.status === 'resting'
             );
     }
+
+    completeGame(courtId) {
+        console.group('🏁 Complete Game Flow');
+        console.time('completeGame');
+        
+        try {
+            const court = this.courts.get(courtId);
+            console.log('Court state before completion:', {
+                id: court.id,
+                status: court.status,
+                players: court.players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    status: p.status,
+                    gamesPlayed: p.gamesPlayed
+                })),
+                queue: court.queue.length,
+                startTime: court.startTime
+            });
+
+            if (!court) {
+                console.error('❌ Court not found:', courtId);
+                throw new Error(`Court ${courtId} not found`);
+            }
+
+            if (court.status !== 'in_progress') {
+                console.warn('⚠️ Invalid court status:', court.status);
+                throw new Error(`Cannot complete game - court status is ${court.status}`);
+            }
+
+            // Update player stats and status
+            console.group('📊 Updating Players');
+            court.players.forEach(player => {
+                const playerObj = this.players.get(player.id);
+                if (playerObj) {
+                    console.log(`Player ${playerObj.name} before:`, {
+                        status: playerObj.status,
+                        gamesPlayed: playerObj.gamesPlayed,
+                        lastGameTime: playerObj.lastGameTime
+                    });
+
+                    playerObj.gamesPlayed++;
+                    playerObj.lastGameTime = Date.now();
+                    playerObj.status = 'resting';
+                    playerObj.courtId = null;
+
+                    console.log(`Player ${playerObj.name} after:`, {
+                        status: playerObj.status,
+                        gamesPlayed: playerObj.gamesPlayed,
+                        lastGameTime: playerObj.lastGameTime
+                    });
+                } else {
+                    console.warn('⚠️ Player not found in registry:', player.id);
+                }
+            });
+            console.groupEnd();
+
+            // Handle queue and next game setup
+            console.group('🔄 Queue Management');
+            console.log('Current queue length:', court.queue.length);
+            
+            if (court.queue.length >= 4) {
+                console.log('Setting up next game from queue');
+                const nextPlayers = court.queue.splice(0, 4);
+                console.log('Next players:', nextPlayers.map(id => {
+                    const player = this.players.get(id);
+                    return player ? player.name : 'Unknown';
+                }));
+
+                nextPlayers.forEach(playerId => {
+                    const player = this.players.get(playerId);
+                    if (player) {
+                        player.status = 'playing';
+                        player.courtId = courtId;
+                        court.players.push(player);
+                        console.log(`Added ${player.name} to next game`);
+                    }
+                });
+                court.status = 'ready';
+            } else {
+                console.log('Not enough players in queue for next game');
+                court.status = 'empty';
+                court.players = [];
+            }
+            console.groupEnd();
+
+            // Final state logging
+            console.group('📝 Final State');
+            console.log('Court after completion:', {
+                status: court.status,
+                players: court.players.length,
+                queue: court.queue.length
+            });
+            console.groupEnd();
+
+            this.saveState();
+            this.eventBus.emit('court:updated', court);
+            this.eventBus.emit('players:updated');
+
+            console.timeEnd('completeGame');
+            console.groupEnd();
+            return true;
+
+        } catch (error) {
+            console.error('❌ Game completion failed:', error);
+            console.timeEnd('completeGame');
+            console.groupEnd();
+            throw error;
+        }
+    }
+
+    initializeCourtViews() {
+        console.group('🎮 Initializing Court Views');
+        this.courts.forEach(court => {
+            const view = new CourtView(court, this, this.eventBus);
+            console.log(`Initialized view for court ${court.id}`);
+        });
+        console.groupEnd();
+    }
 }
 
 // Initialize the app
@@ -514,7 +762,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ['court-1', 'court-2'].forEach(courtId => {
         console.log(`Creating view for court: ${courtId}`);
         const court = gameManager.courts.get(courtId);
-        const view = new CourtView(court, eventBus);
+        const view = new CourtView(court, gameManager, eventBus);
         courtViews.set(courtId, view);
         
         // Create container for this court
@@ -692,10 +940,19 @@ function applyCourtGradients() {
 
 // UI Components
 class CourtView {
-    constructor(court, eventBus) {
+    constructor(court, gameManager, eventBus) {
         this.court = court;
+        this.gameManager = gameManager;
         this.eventBus = eventBus;
         this.element = null;
+        this.render();
+        this.attachEventListeners();
+        
+        console.log('🎾 Initialized CourtView:', {
+            courtId: court.id,
+            hasGameManager: !!gameManager,
+            hasEventBus: !!eventBus
+        });
     }
 
     render() {
@@ -741,6 +998,16 @@ class CourtView {
     renderActions() {
         let primaryButton = '';
         let queueButton = '';
+        let completeButton = '';
+        
+        if (this.court.status === 'in_progress') {
+            completeButton = `
+                <button class="complete-game-btn">
+                    <i class="fas fa-flag-checkered"></i>
+                    Complete Game
+                </button>
+            `;
+        }
         
         if (this.court.status === 'ready') {
             primaryButton = `
@@ -772,7 +1039,10 @@ class CourtView {
         return `
             <div class="court-actions">
                 ${primaryButton}
+            </div>
+            <div class="queue-action-container">
                 ${queueButton}
+                ${completeButton}
             </div>
             ${this.renderQueueSection()}
         `;
@@ -881,7 +1151,7 @@ class CourtView {
 
     attachEventListeners() {
         if (!this.element) {
-            console.error('No element to attach listeners to');
+            console.error('❌ No element to attach listeners to');
             return;
         }
 
@@ -919,6 +1189,33 @@ class CourtView {
             });
         } else {
             console.warn('Queue button not found');
+        }
+
+        const completeGameBtn = this.element.querySelector('.complete-game-btn');
+        if (completeGameBtn) {
+            completeGameBtn.addEventListener('click', () => {
+                console.group('🎯 Complete Game Button Click');
+                try {
+                    if (!this.gameManager) {
+                        throw new Error('GameManager not initialized');
+                    }
+                    
+                    console.log('Completing game for court:', {
+                        id: this.court.id,
+                        status: this.court.status,
+                        players: this.court.players.length
+                    });
+                    
+                    this.gameManager.completeGame(this.court.id);
+                    Toast.show('Game completed successfully!', Toast.types.SUCCESS);
+                } catch (error) {
+                    console.error('Failed to complete game:', error);
+                    Toast.show(error.message, Toast.types.ERROR);
+                }
+                console.groupEnd();
+            });
+            
+            console.log('✅ Complete game button listener attached');
         }
     }
 
@@ -1515,4 +1812,20 @@ class QueueModal {
     updateTeamDisplay() {
         // Implementation of updateTeamDisplay method
     }
+}
+
+function renderQueueActionButtons(court) {
+    const container = court.querySelector('.queue-action-container');
+    container.innerHTML = `
+        <button class="add-to-queue-btn">
+            <i class="fas fa-plus"></i>
+            Add to Queue
+        </button>
+        ${court.classList.contains('active') ? `
+            <button class="complete-game-btn">
+                <i class="fas fa-flag-checkered"></i>
+                Complete Game
+            </button>
+        ` : ''}
+    `;
 }
