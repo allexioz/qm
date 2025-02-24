@@ -338,13 +338,15 @@ body {
 
     /* Update court touch handling */
     .court-2d {
-        /* Remove touch-action that was blocking page scroll */
+        /* Remove aspect ratio */
+        aspect-ratio: unset;
+        height: auto;
+        /* Keep other existing styles */
         touch-action: none;
-        /* Other existing styles */
         width: calc(100% - var(--spacing-md) * 2);
         max-width: 100%;
         margin: var(--spacing-md);
-        border-radius: 24px; /* Keep the border radius */
+        border-radius: 24px;
     }
 
     /* Ensure container allows scrolling */
@@ -581,7 +583,31 @@ body {
         aspect-ratio: 3/4; /* More compact ratio for mobile */
         scroll-snap-align: center; /* Snap points for each court */
         scroll-snap-stop: always; /* Force stopping at snap points */
-        touch-action: pan-x; /* Enable horizontal pan gesture */
+        touch-action: pan-x pan-y; /* Allow natural scrolling */
+        pointer-events: none; /* Prevent touch interference */
+        
+        /* Keep existing styles */
+        aspect-ratio: unset;
+        min-height: 500px;
+        width: calc(100% - var(--spacing-md) * 2);
+        max-width: 100%;
+        margin: var(--spacing-md);
+        border-radius: 24px;
+    }
+
+    /* But allow touches on interactive elements */
+    .court-header,
+    .court-bottom-section,
+    .queue-action-container,
+    button {
+        pointer-events: auto;
+    }
+
+    /* Ensure container scrolls smoothly */
+    .courts-container {
+        touch-action: pan-y;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: var(--spacing-lg);
     }
 }
 
@@ -2123,5 +2149,10 @@ body {
 
     .court-2d .court-lines {
         transition: none;
+    }
+
+    /* Add bottom spacing for tab bar */
+    .views-container {
+        padding-bottom: calc(60px + env(safe-area-inset-bottom));
     }
 } 
