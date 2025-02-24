@@ -2030,4 +2030,59 @@ body {
     .courts-container:active .court-2d .court-lines {
         transform: scale(0.98);
     }
+}
+
+/* Fix horizontal scrolling on mobile */
+@media (max-width: 768px) {
+    /* Prevent horizontal overflow */
+    body {
+        overflow-x: hidden;
+        width: 100%;
+        position: relative;
+    }
+
+    /* Ensure views stay within viewport */
+    .views-container {
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    .view {
+        width: 100%;
+        max-width: 100vw;
+        overflow-x: hidden;
+    }
+
+    /* Update courts container sizing */
+    .courts-container {
+        width: 100%;
+        padding: 0;
+        margin: 0;
+        max-width: 100%;
+        grid-template-columns: 100%; /* Full width single column */
+    }
+
+    /* Ensure court fits within viewport */
+    .court-2d {
+        width: 100%;
+        max-width: 100%;
+        margin: 0 0 var(--spacing-md) 0;
+        border-radius: 0; /* Optional: Remove border radius for edge-to-edge design */
+    }
+
+    /* Fix mobile players content width */
+    .mobile-players-content {
+        width: 100%;
+        max-width: 100%;
+        padding-left: var(--spacing-md);
+        padding-right: var(--spacing-md);
+        box-sizing: border-box;
+    }
+
+    /* Ensure import section stays within bounds */
+    .import-section {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
 } 
