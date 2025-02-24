@@ -2174,18 +2174,49 @@ function renderQueueActionButtons(court) {
     `;
 }
 
-// Register Service Worker
+// Add at the start of your initialization code
+const APP_VERSION = '1.0.0'; // Match this with CACHE_VERSION in sw.js
+
+// Register Service Worker with version check
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then(registration => {
-                console.log('ServiceWorker registration successful');
-            })
-            .catch(err => {
-                console.log('ServiceWorker registration failed: ', err);
+    window.addEventListener('load', async () => {
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            
+            // Check for updates
+            registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // New version available
+                        Toast.show('New version available! Refresh to update.', Toast.types.INFO);
+                        
+                        // Add refresh button to toast
+                        const refreshButton = document.createElement('button');
+                        refreshButton.textContent = 'Refresh Now';
+                        refreshButton.onclick = () => window.location.reload();
+                        document.querySelector('.toast-container').appendChild(refreshButton);
+                    }
+                });
             });
+
+            // Force update check on load
+            registration.update();
+            
+            console.log('ServiceWorker registered successfully');
+        } catch (err) {
+            console.error('ServiceWorker registration failed: ', err);
+        }
     });
 }
+
+// Add periodic update checks
+setInterval(() => {
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
+    }
+}, 60 * 60 * 1000); // Check every hour
 
 // After your existing service worker registration code
 window.addEventListener('online', () => {
