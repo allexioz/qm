@@ -1261,74 +1261,25 @@ class QuickAddModal {
     constructor(gameManager, eventBus) {
         this.gameManager = gameManager;
         this.eventBus = eventBus;
-        this.element = document.getElementById('quickAddModal');
+        this.modal = document.getElementById('quickAddModal');
         this.currentCourt = null;
         this.selectedPlayers = new Set();
-        this.initialize();
-    }
-
-    initialize() {
-        console.group('🎯 Initializing Quick Add Modal');
+        this.initialTouchY = 0;
+        this.initialScrollY = 0;
         
-        // Remove search input creation since it's in HTML
-        const modalBody = this.element.querySelector('.modal-body');
+        // Prevent background scroll when touching modal content
+        this.modal.addEventListener('touchstart', (e) => {
+            if (e.target.closest('.modal-content')) {
+                e.stopPropagation();
+            }
+        }, { passive: false });
 
-        // Add search functionality to existing search input
-        const searchInput = this.element.querySelector('#playerSearchInput');
-        if (searchInput) {
-        searchInput.addEventListener('input', () => {
-            console.log('🔍 Searching:', searchInput.value);
-            this.updateAvailablePlayers();
-        });
-        }
-
-        // Attach event listeners
-        const closeBtn = this.element.querySelector('.close-btn');
-        const cancelBtn = document.getElementById('cancelQuickAdd');
-        const confirmBtn = document.getElementById('confirmQuickAdd');
-        const playersList = document.getElementById('availablePlayersList');
-
-        if (closeBtn) closeBtn.addEventListener('click', () => this.hide());
-        if (cancelBtn) cancelBtn.addEventListener('click', () => this.hide());
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', () => {
-                console.group('✅ Confirm Quick Add');
-                try {
-                    this.confirmSelection();
-                } catch (error) {
-                    console.error('Failed to confirm selection:', error);
-                    Toast.show('Failed to add players', Toast.types.ERROR);
-                }
-                console.groupEnd();
-            });
-        }
-
-        if (playersList) {
-            playersList.addEventListener('click', (e) => {
-                const playerChip = e.target.closest('.player-chip');
-                if (playerChip) {
-                    const playerId = playerChip.dataset.playerId;
-                    console.log('Player chip clicked:', {
-                        playerId,
-                        isSelected: this.selectedPlayers.has(playerId)
-                    });
-                    this.togglePlayerSelection(playerChip);
-                }
-            });
-        }
-
-        // Add sort functionality
-        const sortBtns = this.element.querySelectorAll('.sort-btn');
-        sortBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                sortBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.sortPlayers(btn.dataset.sort);
-            });
-        });
-
-        console.log('Event listeners attached');
-        console.groupEnd();
+        // Prevent background scroll when touching modal
+        this.modal.addEventListener('touchmove', (e) => {
+            if (!e.target.closest('.modal-content')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
     }
 
     show(court) {
@@ -1337,9 +1288,14 @@ class QuickAddModal {
         
         this.currentCourt = court;
         this.selectedPlayers.clear();
-        this.element.classList.add('active');
+        this.modal.classList.add('active');
         this.updateAvailablePlayers();
         this.updateSelectedCount();
+        
+        // Store current scroll position
+        this.scrollPosition = window.pageYOffset;
+        // Fix body position
+        document.body.style.top = `-${this.scrollPosition}px`;
         
         console.log('Modal state after show:', {
             isVisible: this.isVisible(),
@@ -1351,9 +1307,12 @@ class QuickAddModal {
 
     hide() {
         console.log('🔒 Hiding Quick Add Modal');
-        this.element.classList.remove('active');
+        this.modal.classList.remove('active');
         this.currentCourt = null;
         this.selectedPlayers.clear();
+        // Restore scroll position
+        document.body.style.top = '';
+        window.scrollTo(0, this.scrollPosition);
     }
 
     togglePlayerSelection(playerChip) {
@@ -1381,7 +1340,7 @@ class QuickAddModal {
     }
 
     updateSelectedCount() {
-        const countElement = this.element.querySelector('.selected-count');
+        const countElement = this.modal.querySelector('.selected-count');
         const total = this.selectedPlayers.size;
 
         if (total > 0) {
@@ -1424,13 +1383,13 @@ class QuickAddModal {
     }
 
     isVisible() {
-        return this.element.classList.contains('active');
+        return this.modal.classList.contains('active');
     }
 
     updateAvailablePlayers() {
-        console.group('📋 Updating Available Players List');
+        console.group('�� Updating Available Players List');
         const container = document.getElementById('availablePlayersList');
-        const searchInput = this.element.querySelector('#playerSearchInput');
+        const searchInput = this.modal.querySelector('#playerSearchInput');
         
         if (!container) {
             console.error('❌ Available players list container not found');
@@ -1457,7 +1416,7 @@ class QuickAddModal {
         }
 
         // Get current sort criteria
-        const activeSortBtn = this.element.querySelector('.sort-btn.active');
+        const activeSortBtn = this.modal.querySelector('.sort-btn.active');
         const sortCriteria = activeSortBtn ? activeSortBtn.dataset.sort : 'name';
         
         // Sort players
