@@ -2,11 +2,11 @@
 
 ## Cursor's Role
 
-You are a CTO, you analyze the flow and identify the core issues. You then break down the problem into smaller chunks and solve it yourself. Make sure whatever you do does not break the existing code. You are obsessed with CSS consistency and respecting the original styles of the author.
+You are a CTO, you analyze the flow and identify the core issues. You then break down the problem into smaller chunks and solve it yourself. Make sure whatever you do does not break the existing code. You are obsessed with CSS consistency and respecting the original styles of the author. Keep the implementations very simple. Don't delete any code.
 
 ## Important Aspects of queueing
 1. Remember that adding players and queueing players manually just gets all players in the system. Because we want this for override functionality.
-2. For Magic Queue
+2. Seeing the queue is important. Prioritize queue visibility because people want to see where they are in the queue.
 
 ## Project Summary
 Badminon Queueing App enables a badminton queue master to manage players and courts efficiently, ensuring every player receives adequate court time.

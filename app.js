@@ -910,14 +910,33 @@ function initializeTabs() {
 
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
+            console.group('📱 Tab Switch');
+            console.log('Switching to tab:', tab.dataset.view);
+            
+            // Remove active class from all tabs and views
             tabs.forEach(t => t.classList.remove('active'));
             views.forEach(v => v.classList.remove('active'));
 
+            // Add active class to clicked tab
             tab.classList.add('active');
+            
+            // Find and activate corresponding view
             const viewId = `${tab.dataset.view}-view`;
-            document.getElementById(viewId).classList.add('active');
+            const view = document.getElementById(viewId);
+            if (view) {
+                view.classList.add('active');
+                console.log('Activated view:', viewId);
+            } else {
+                console.error('View not found:', viewId);
+            }
+            
+            console.groupEnd();
         });
     });
+
+    // Ensure courts view is active by default
+    document.getElementById('courts-view').classList.add('active');
+    document.querySelector('[data-view="courts"]').classList.add('active');
 }
 
 // Add function to generate random mesh gradients
@@ -1009,9 +1028,9 @@ function generateCourtGradient() {
     const palette = palettes[Math.floor(Math.random() * palettes.length)];
     
     // Enhanced saturation and lightness variations for more vibrancy
-    const color1 = `hsl(${palette.h1}, ${10 + Math.random() * 10}%, ${65 + Math.random() * 5}%)`;
-    const color2 = `hsl(${palette.h2}, ${75 + Math.random() * 10}%, ${70 + Math.random() * 5}%)`;
-    const color3 = `hsl(${palette.h3}, ${90 + Math.random() * 10}%, ${67 + Math.random() * 5}%)`;
+    const color1 = `hsl(${palette.h1}, ${89 + Math.random() * 10}%, ${95 + Math.random() * 5}%)`;
+    const color2 = `hsl(${palette.h2}, ${65 + Math.random() * 10}%, ${80 + Math.random() * 5}%)`;
+    const color3 = `hsl(${palette.h3}, ${80 + Math.random() * 10}%, ${87 + Math.random() * 5}%)`;
     
     return {
         gradient1: color1,
@@ -1313,6 +1332,26 @@ class CourtView {
             console.groupEnd();
         });
 
+        // Add queue removal handler
+        this.element.addEventListener('click', (e) => {
+            const removeBtn = e.target.closest('.remove-queue-btn');
+            if (removeBtn) {
+                e.stopPropagation();
+                const index = parseInt(removeBtn.dataset.queueIndex, 10);
+                
+                // Remove the match (4 players) from the queue
+                const queue = this.court.queue;
+                queue.splice(index * 4, 4);  // Remove 4 players starting at the index
+                
+                // Save and re-render
+                this.gameManager.saveState();
+                this.render();
+                
+                // Show confirmation toast
+                Toast.show('Match removed from queue', Toast.types.SUCCESS);
+            }
+        });
+
         this.listenersAttached = true;
         console.groupEnd();
     }
@@ -1463,8 +1502,8 @@ class CourtView {
             // Only create a match if we have exactly 4 players
             if (matchPlayers.length === 4) {
                 matches.push({
-                    teamA: matchPlayers.slice(0, 2).map(p => p.name.split(' ')[0]).join(' & '),
-                    teamB: matchPlayers.slice(2, 4).map(p => p.name.split(' ')[0]).join(' & ')
+                    players: matchPlayers.map(p => p.name),
+                    index: i / 4  // Add index for removal
                 });
             }
         }
@@ -1478,11 +1517,14 @@ class CourtView {
                 <div class="queue-header">Next Up (${matches.length} ${matches.length === 1 ? 'match' : 'matches'})</div>
                 <div class="queue-list">
                     ${displayMatches.map((match, index) => `
-                        <div class="queue-match">
-                            <span class="match-number">${index + 1}</span>
-                            <span class="team-a">${match.teamA}</span>
-                            <span class="vs">vs</span>
-                            <span class="team-b">${match.teamB}</span>
+                        <div class="queue-item">
+                            <div class="queue-content">
+                                <span class="queue-number">${index + 1}</span>
+                                <span class="queue-players">${match.players.join(' & ')}</span>
+                            </div>
+                            <button class="remove-queue-btn" data-queue-index="${match.index}" aria-label="Remove from queue">
+                                <i class="fas fa-times"></i>
+                            </button>
                         </div>
                     `).join('')}
                     ${remainingMatches > 0 ? `
@@ -1962,6 +2004,12 @@ class PlayerListView {
         this.gameManager = gameManager;
         this.updateUI(); // Initial render
     }
+
+    // Add this method
+    updateUI() {
+        // Update the players list when UI needs refresh
+        this.updatePlayersList();
+    }
 }
 
 // Helper function to format the last game time
@@ -2348,3 +2396,39 @@ window.addEventListener('beforeinstallprompt', (e) => {
     deferredPrompt = e;
     // Optionally show your own install button/prompt
 });
+
+// Find the function that renders the queue items
+function renderQueueItem(queueItem, index) {
+    // ... existing code ...
+    const queueItemElement = document.createElement('div');
+    queueItemElement.className = 'queue-item';
+    queueItemElement.innerHTML = `
+        <div class="queue-content">
+            <span class="queue-number">${index + 1}</span>
+            <span class="queue-players">${queueItem.players.join(' & ')}</span>
+        </div>
+        <button class="remove-queue-btn" data-queue-index="${index}" aria-label="Remove from queue">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+
+    // Add click handler for the remove button
+    const removeBtn = queueItemElement.querySelector('.remove-queue-btn');
+    removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeQueueItem(index);
+    });
+
+    return queueItemElement;
+}
+
+// Add this new function to handle queue removal
+function removeQueueItem(index) {
+    const queue = getQueue();
+    queue.splice(index, 1);
+    saveQueue(queue);
+    renderQueue();
+    updatePlayerStats();
+}
+
+// ... existing code ...

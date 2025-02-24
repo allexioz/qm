@@ -382,13 +382,15 @@ body {
 .court-number {
     font-size: 1.2em;
     font-weight: 600;
-    color: white;
+    mix-blend-mode: difference;
+    color: rgba(148, 148, 148, 0.787);
 }
 
 .court-status {
     display: flex;
     align-items: center;
     gap: 4px;
+    
     background: rgba(255, 255, 255, 1);
     padding: 4px 8px;
     border-radius: 12px;
@@ -658,13 +660,46 @@ body {
 .queue-item {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    padding: 4px var(--spacing-sm);
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 6px;
+    font-size: 0.8em;
+    color: #333;
+}
+
+.queue-content {
+    display: flex;
+    align-items: center;
     gap: var(--spacing-sm);
-    font-size: 0.85em;
+    flex: 1;
+}
+
+.queue-item .remove-queue-btn {
+    background: none;
+    border: none;
+    color: #ff4444;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 0.9em;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.queue-item .remove-queue-btn:hover {
+    opacity: 1;
+}
+
+.queue-item .remove-queue-btn i {
+    font-size: 0.9em;
 }
 
 .queue-number {
-    background: var(--primary-color);
-    color: white;
+    background: white;
+    color: black;
     width: 20px;
     height: 20px;
     border-radius: 50%;
@@ -2248,26 +2283,209 @@ body {
 }
 
 .magic-queue-btn {
-    background: rgba(0, 0, 0, 0.04);
-    color: #333;
-    border: none;
+    background: linear-gradient(
+        135deg,
+        rgba(147, 51, 234, 0.1) 0%,
+        rgba(79, 70, 229, 0.1) 100%
+    );
+    color: #6366F1;
+    border: 1px solid rgba(99, 102, 241, 0.2);
     font-size: 0.9em;
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: 12px;
     height: 40px;
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--spacing-sm);
 }
 
 .magic-queue-btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 
+        0 4px 12px rgba(99, 102, 241, 0.15),
+        0 2px 4px rgba(99, 102, 241, 0.1);
+    background: linear-gradient(
+        135deg,
+        rgba(147, 51, 234, 0.15) 0%,
+        rgba(79, 70, 229, 0.15) 100%
+    );
+}
+
+.magic-queue-btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+/* Add sparkle effect */
+.magic-queue-btn::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(
+        circle,
+        rgba(255, 255, 255, 0.1) 0%,
+        transparent 70%
+    );
+    transform: rotate(45deg);
+    animation: sparkle 3s infinite linear;
+    pointer-events: none;
+}
+
+@keyframes sparkle {
+    from {
+        transform: rotate(0deg) translate(-50%, -50%);
+    }
+    to {
+        transform: rotate(360deg) translate(-50%, -50%);
+    }
 }
 
 .magic-queue-btn i {
-    color: #666666;
-} 
+    color: #6366F1;
+    font-size: 1.1em;
+    animation: wiggle 2s infinite;
+}
+
+@keyframes wiggle {
+    0%, 100% {
+        transform: rotate(-5deg);
+    }
+    50% {
+        transform: rotate(5deg);
+    }
+}
+
+/* Add responsive adjustments */
+@media (max-width: 768px) {
+    .magic-queue-btn {
+        height: 48px; /* Larger touch target on mobile */
+        font-size: 1em;
+    }
+    
+    .magic-queue-btn i {
+        font-size: 1.2em;
+    }
+}
+
+/* Add disabled state */
+.magic-queue-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.1);
+    transform: none;
+    box-shadow: none;
+}
+
+.magic-queue-btn:disabled i {
+    animation: none;
+    color: #666;
+}
+
+/* Add loading state */
+.magic-queue-btn.loading {
+    background: rgba(99, 102, 241, 0.1);
+    cursor: wait;
+}
+
+.magic-queue-btn.loading i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Add these styles where other queue-related styles are */
+.queue-item .remove-queue-btn {
+    background: none;
+    border: none;
+    color: #ff4444;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 0.9em;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.queue-item .remove-queue-btn:hover {
+    opacity: 1;
+}
+
+/* Update view container styles */
+.views-container {
+    position: relative;
+    height: 100vh;
+    overflow-x: hidden;
+}
+
+.view {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.view.active {
+    display: block;
+}
+
+/* Ensure mobile players view takes full height */
+#players-view {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom)); /* Space for tab bar */
+}
+
+/* Update mobile tab styles */
+@media (max-width: 768px) {
+    .mobile-tabs {
+        display: flex;
+        justify-content: space-around;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        padding: var(--spacing-sm);
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        padding-bottom: calc(var(--spacing-sm) + env(safe-area-inset-bottom));
+    }
+
+    .tab-btn {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: var(--spacing-sm);
+        background: none;
+        border: none;
+        color: #8E8E93;
+        font-size: 0.8em;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+        color: var(--primary-color);
+    }
+}
