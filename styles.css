@@ -335,6 +335,37 @@ body {
     .court-actions {
         margin-bottom: 0px !important;
     }
+
+    /* Update court touch handling */
+    .court-2d {
+        /* Remove touch-action that was blocking page scroll */
+        touch-action: none;
+        /* Other existing styles */
+        width: calc(100% - var(--spacing-md) * 2);
+        max-width: 100%;
+        margin: var(--spacing-md);
+        border-radius: 24px; /* Keep the border radius */
+    }
+
+    /* Ensure container allows scrolling */
+    .courts-container {
+        touch-action: pan-y; /* Enable vertical scrolling */
+        -webkit-overflow-scrolling: touch;
+        overflow-y: auto;
+        overflow-x: hidden;
+        width: 100%;
+        padding: 0;
+        margin: 0;
+        max-width: 100%;
+        grid-template-columns: 100%;
+    }
+
+    /* Ensure view container allows scrolling */
+    .view {
+        touch-action: pan-y; /* Enable vertical scrolling */
+        -webkit-overflow-scrolling: touch;
+        overflow-y: auto;
+    }
 }
 
 .court-header {
@@ -2067,7 +2098,7 @@ body {
         width: 100%;
         max-width: 100%;
         margin: 0 0 var(--spacing-md) 0;
-        border-radius: 0; /* Optional: Remove border radius for edge-to-edge design */
+        border-radius: 24px; /* Keep the border radius */
     }
 
     /* Fix mobile players content width */
