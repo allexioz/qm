@@ -1,7 +1,7 @@
 {
-    "name": "Badminton Queue Manager",
-    "short_name": "Queue Manager",
-    "description": "Manage badminton court queues and players",
+    "name": "Badminton Queue Master",
+    "short_name": "Queue Master",
+    "description": "Manage badminton court queues and players. By Alexis Collado.",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#F2F2F7",
