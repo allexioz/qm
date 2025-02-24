@@ -2093,3 +2093,21 @@ function renderQueueActionButtons(court) {
         ` : ''}
     `;
 }
+
+// Add this near your modal handling code
+function showModal(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.classList.add('active');
+    document.body.classList.add('modal-open');
+    
+    // Calculate and store scrollbar width
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.documentElement.style.setProperty('--scrollbar-width', `${scrollbarWidth}px`);
+}
+
+function hideModal(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.classList.remove('active');
+    document.body.classList.remove('modal-open');
+    document.documentElement.style.removeProperty('--scrollbar-width');
+}
