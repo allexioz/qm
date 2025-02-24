@@ -2014,7 +2014,9 @@ body {
 
 /* Add momentum scrolling for iOS devices */
 @supports (-webkit-touch-callout: none) {
-    .courts-container {
+    .views-container,
+    .courts-container,
+    .mobile-players-content {
         -webkit-overflow-scrolling: touch;
     }
 }
