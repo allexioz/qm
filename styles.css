@@ -1246,86 +1246,121 @@ body {
     transition: opacity 0.3s ease;
 }
 
-/* Toast System */
+/* Toast Container */
 .toast-container {
     position: fixed;
+    top: calc(env(safe-area-inset-top) + 16px);
+    right: 16px;
     z-index: 9999;
-    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     pointer-events: none;
 }
 
-/* Desktop positioning (bottom) */
-@media (min-width: 769px) {
-    .toast-container {
-        bottom: 0;
-        right: 0;
-    }
-
-    .toast {
-        transform: translateY(100%);
-    }
-
-    .toast.show {
-        transform: translateY(0);
-    }
-}
-
-/* Mobile positioning (top) */
-@media (max-width: 768px) {
-    .toast-container {
-        top: 0;
-        left: 0;
-        right: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding-top: max(env(safe-area-inset-top), var(--spacing-md)); /* Account for notch */
-    }
-
-    .toast {
-        transform: translateY(-100%);
-        width: calc(100% - var(--spacing-md) * 2);
-        max-width: 400px;
-    }
-
-    .toast.show {
-        transform: translateY(0);
-    }
-}
-
-/* Toast styling */
+/* Toast Notification */
 .toast {
-    background: white;
-    border-radius: 12px;
-    padding: var(--spacing-md);
-    margin-top: var(--spacing-sm);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    pointer-events: auto;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-}
-
-.toast i {
-    font-size: 1.2em;
-}
-
-.toast-success {
-    background: var(--status-playing);
     color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0;
+    transform: translateX(100%);
+    animation: toast-slide-in 0.3s ease forwards;
+    position: relative;
+    overflow: hidden;
+    min-width: 200px;
+    max-width: 400px;
+    pointer-events: auto;
+}
+
+/* Toast Types */
+.toast-success {
+    background: rgba(52, 199, 89, 0.9);
 }
 
 .toast-error {
-    background: var(--status-waiting);
-    color: white;
+    background: rgba(255, 59, 48, 0.9);
+}
+
+.toast-warning {
+    background: rgba(255, 149, 0, 0.9);
 }
 
 .toast-info {
-    background: var(--primary-color);
-    color: white;
+    background: rgba(0, 122, 255, 0.9);
+}
+
+/* Toast Count Badge */
+.toast-count {
+    margin-left: 6px;
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+/* Toast Progress Bar */
+.toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.3);
+    transform-origin: left;
+}
+
+/* Toast Animations */
+@keyframes toast-slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes toast-progress {
+    from {
+        transform: scaleX(1);
+    }
+    to {
+        transform: scaleX(0);
+    }
+}
+
+.toast-fade-out {
+    animation: toast-fade-out 0.3s ease forwards;
+}
+
+@keyframes toast-fade-out {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+/* Adjust for mobile */
+@media (max-width: 768px) {
+    .toast-container {
+        left: 16px;
+        right: 16px;
+    }
+    
+    .toast {
+        width: 100%;
+        max-width: none;
+    }
 }
 
 /* Add queue button styles */
@@ -2174,7 +2209,7 @@ body {
 /* Prevent zoom on mobile inputs */
 #playerImport,
 #mobilePlayerImport {
-    font-size: 16px;
+    font-size: 12px;
     max-height: 150px;
     touch-action: manipulation; /* Prevent double-tap zoom */
 }

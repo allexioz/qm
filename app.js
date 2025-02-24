@@ -416,6 +416,7 @@ class GameManager {
         this.players.set(player.id, player);
         this.eventBus.emit('player:added', player);
         this.saveState();
+        Toast.show(Toast.messages.PLAYER_ADDED(name));
         return player;
     }
 
@@ -488,7 +489,7 @@ class GameManager {
             this.saveState();
 
             // Emit events after state is saved
-            Toast.show('Game started!', Toast.types.SUCCESS);
+            Toast.show(Toast.messages.GAME_STARTED);
             this.eventBus.emit('game:started', court);
             this.eventBus.emit('players:updated');
             
@@ -545,10 +546,11 @@ class GameManager {
 
         if (newPlayers.length > 0) {
             console.log(`✅ Added ${newPlayers.length} new players`);
-            Toast.show(`Added ${newPlayers.length} new player${newPlayers.length === 1 ? '' : 's'}`, Toast.types.SUCCESS);
+            const count = newPlayers.length;
+            Toast.show(Toast.messages.IMPORT_SUCCESS(count));
         } else {
             console.log('ℹ️ All players already exist');
-            Toast.show('All players already exist', Toast.types.INFO);
+            Toast.show(Toast.messages.IMPORT_DUPLICATE);
         }
 
         this.saveState();
@@ -586,6 +588,7 @@ class GameManager {
         this.eventBus.emit('players:updated');
         
         console.log('✅ All data reset successfully');
+        Toast.show('🔄 All players removed', Toast.types.INFO);
         console.groupEnd();
     }
 
@@ -624,7 +627,8 @@ class GameManager {
         });
 
         if (addedPlayers.length > 0) {
-            Toast.show(`Added ${addedPlayers.length} player${addedPlayers.length === 1 ? '' : 's'} to queue`, Toast.types.SUCCESS);
+            const count = addedPlayers.length;
+            Toast.show(Toast.messages.QUEUE_ADDED(count));
             this.saveState();
             this.eventBus.emit('court:updated', court);
             this.eventBus.emit('players:updated');
@@ -1801,17 +1805,102 @@ function formatPlayerStatus(status) {
     return statusMap[status] || status;
 }
 
-// Also add back the Toast class
+// Toast notification system
 class Toast {
     static types = {
-        SUCCESS: 'success',
-        ERROR: 'error',
-        INFO: 'info'
+        SUCCESS: {
+            name: 'success',
+            icon: 'fa-check-circle',
+            duration: 3000
+        },
+        ERROR: {
+            name: 'error',
+            icon: 'fa-exclamation-circle',
+            duration: 4000
+        },
+        INFO: {
+            name: 'info',
+            icon: 'fa-info-circle',
+            duration: 3000
+        },
+        WARNING: {
+            name: 'warning',
+            icon: 'fa-exclamation-triangle',
+            duration: 3500
+        }
+    };
+
+    static messages = {
+        PLAYER_ADDED: (name) => ({ 
+            text: `👋 Welcome, ${name}!`,
+            type: Toast.types.SUCCESS 
+        }),
+        PLAYER_REMOVED: {
+            text: '👋 Player removed',
+            type: Toast.types.INFO
+        },
+        GAME_STARTED: {
+            text: '🎯 Game started! Have fun!',
+            type: Toast.types.SUCCESS
+        },
+        GAME_ENDED: {
+            text: '✅ Game completed',
+            type: Toast.types.SUCCESS
+        },
+        QUEUE_ADDED: (count) => ({
+            text: `${count} ${count === 1 ? 'player' : 'players'} added to queue`,
+            type: Toast.types.SUCCESS
+        }),
+        QUEUE_REMOVED: {
+            text: 'Player removed from queue',
+            type: Toast.types.INFO
+        },
+        NETWORK_ONLINE: {
+            text: '📶 Connected to network',
+            type: Toast.types.SUCCESS
+        },
+        NETWORK_OFFLINE: {
+            text: '📴 Working offline - Changes will sync when connected',
+            type: Toast.types.INFO
+        },
+        IMPORT_SUCCESS: (count) => ({
+            text: `✨ ${count} new ${count === 1 ? 'player' : 'players'} added`,
+            type: Toast.types.SUCCESS
+        }),
+        IMPORT_DUPLICATE: {
+            text: 'All players already exist',
+            type: Toast.types.INFO
+        },
+        ERROR_QUEUE_FULL: {
+            text: '⚠️ Queue is full for this court',
+            type: Toast.types.WARNING
+        },
+        ERROR_ALREADY_PLAYING: {
+            text: '⚠️ Player is already in a game',
+            type: Toast.types.WARNING
+        },
+        ERROR_INVALID_PLAYER: {
+            text: '❌ Please select valid players',
+            type: Toast.types.ERROR
+        },
+        ERROR_DUPLICATE_NAME: {
+            text: '⚠️ A player with this name already exists',
+            type: Toast.types.WARNING
+        },
+        ERROR_GENERIC: {
+            text: '❌ Something went wrong. Please try again',
+            type: Toast.types.ERROR
+        }
     };
 
     static container = null;
+    static queue = [];
+    static isProcessing = false;
+    static maxVisible = 3;
+    static groupingWindow = 2000; // 2 seconds window for grouping similar messages
 
-    static initialize() {
+    static init() {
+        // Create container if it doesn't exist
         if (!this.container) {
             this.container = document.createElement('div');
             this.container.className = 'toast-container';
@@ -1819,279 +1908,117 @@ class Toast {
         }
     }
 
-    static show(message, type = this.types.INFO, duration = 3000) {
-        console.log(`🔔 Toast: ${type} - ${message}`);
-        this.initialize();
+    static show(messageConfig) {
+        // Allow both direct message strings and message configs
+        const config = typeof messageConfig === 'string' 
+            ? { text: messageConfig, type: this.types.INFO }
+            : messageConfig;
 
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
+        this.init();
+        this.addToQueue(config);
+        this.processQueue();
+    }
+
+    static addToQueue({ text, type }) {
+        const similarToast = this.findSimilarToast(text);
+        if (similarToast) {
+            this.updateToastCount(similarToast);
+            return;
+        }
+
+        this.queue.push({
+            text,
+            type,
+            duration: type.duration || 3000
+        });
+    }
+
+    static findSimilarToast(text) {
+        return Array.from(this.container.children).find(toast => {
+            const toastText = toast.querySelector('.toast-message').textContent;
+            return toastText === text && 
+                   Date.now() - toast.dataset.created < this.groupingWindow;
+        });
+    }
+
+    static updateToastCount(toast) {
+        const count = (parseInt(toast.dataset.count) || 1) + 1;
+        toast.dataset.count = count;
         
-        const icon = this.getIcon(type);
-        toast.innerHTML = `
-            <i class="fas ${icon}"></i>
-            <span>${message}</span>
-        `;
+        const countBadge = toast.querySelector('.toast-count') || 
+                          document.createElement('span');
+        countBadge.className = 'toast-count';
+        countBadge.textContent = `(${count})`;
+        
+        const messageEl = toast.querySelector('.toast-message');
+        if (!messageEl.contains(countBadge)) {
+            messageEl.appendChild(countBadge);
+        }
+    }
+
+    static processQueue() {
+        if (this.isProcessing || this.queue.length === 0) return;
+        this.isProcessing = true;
+
+        // Remove excess toasts
+        while (this.container.children.length >= this.maxVisible) {
+            this.container.removeChild(this.container.firstChild);
+        }
+
+        const { text, type, duration } = this.queue.shift();
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type.name}`;
+        toast.dataset.created = Date.now();
+        toast.dataset.count = 1;
+
+        // Add icon based on type
+        const icon = document.createElement('i');
+        icon.className = `fas ${type.icon}`;
+        
+        const messageEl = document.createElement('span');
+        messageEl.className = 'toast-message';
+        messageEl.textContent = text;
+
+        toast.appendChild(icon);
+        toast.appendChild(messageEl);
+        
+        // Add progress bar
+        const progress = document.createElement('div');
+        progress.className = 'toast-progress';
+        toast.appendChild(progress);
 
         this.container.appendChild(toast);
 
-        requestAnimationFrame(() => {
-            toast.classList.add('show');
-        });
+        // Animate progress bar
+        progress.style.animation = `toast-progress ${duration}ms linear`;
 
+        // Remove toast after duration
         setTimeout(() => {
-            toast.classList.remove('show');
-            toast.addEventListener('transitionend', () => {
-                toast.remove();
-            });
+            toast.classList.add('toast-fade-out');
+            setTimeout(() => {
+                if (toast.parentNode === this.container) {
+                    this.container.removeChild(toast);
+                }
+                this.isProcessing = false;
+                this.processQueue();
+            }, 300);
         }, duration);
     }
-
-    static getIcon(type) {
-        const icons = {
-            [this.types.SUCCESS]: 'fa-check-circle',
-            [this.types.ERROR]: 'fa-exclamation-circle',
-            [this.types.INFO]: 'fa-info-circle'
-        };
-        return icons[type] || icons[this.types.INFO];
-    }
 }
 
-// Add QueueModal class
-class QueueModal {
-    constructor(gameManager, eventBus) {
-        this.gameManager = gameManager;
-        this.eventBus = eventBus;
-        this.element = document.getElementById('queueModal');
-        this.selectedPlayers = new Set();
-        this.currentCourt = null;
-        this.initialize();
-    }
-
-    initialize() {
-        // Close button
-        this.element.querySelector('.close-btn').addEventListener('click', () => this.hide());
-        
-        // Cancel button
-        document.getElementById('cancelQueue').addEventListener('click', () => this.hide());
-        
-        // Confirm button
-        document.getElementById('confirmQueue').addEventListener('click', () => this.confirmSelection());
-        
-        // Player selection
-        const playersList = document.getElementById('queuePlayersList');
-        playersList.addEventListener('click', (e) => {
-            const playerChip = e.target.closest('.player-chip');
-            if (playerChip) {
-                this.togglePlayerSelection(playerChip);
-            }
-        });
-
-        // Search functionality
-        const searchInput = document.getElementById('queueSearchInput');
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                this.filterPlayers(e.target.value);
-            });
-        }
-
-        // Sort buttons
-        const sortBtns = this.element.querySelectorAll('.sort-btn');
-        sortBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                sortBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.sortPlayers(btn.dataset.sort);
-            });
-        });
-    }
-
-    show(court) {
-        this.currentCourt = court;
-        this.selectedPlayers.clear();
-        this.element.classList.add('active');
-        
-        // Initial render with all players sorted by name
-        this.sortPlayers('name');
-    }
-
-    hide() {
-        this.element.classList.remove('active');
-        this.selectedPlayers.clear();
-        this.currentCourt = null;
-    }
-
-    updateSelectedCount() {
-        const countElement = this.element.querySelector('.selected-count');
-        if (countElement) {
-            const total = this.selectedPlayers.size;
-            countElement.innerHTML = `<span>Selected Players (${total}/4)</span>`;
-            countElement.classList.toggle('full', total === 4);
-        }
-    }
-
-    togglePlayerSelection(chipElement) {
-        const playerId = chipElement.dataset.playerId;
-        
-        if (this.selectedPlayers.has(playerId)) {
-            this.selectedPlayers.delete(playerId);
-        } else if (this.selectedPlayers.size < 4) {
-            this.selectedPlayers.add(playerId);
-        } else {
-            Toast.show('Maximum 4 players can be selected', Toast.types.WARNING);
-            return;
-        }
-
-        this.updateUI();
-    }
-
-    updateUI() {
-        // Update available players list
-        this.sortPlayers('name');
-
-        // Update selected count
-        this.updateSelectedCount();
-    }
-
-    renderPlayers(players) {
-        const container = document.getElementById('queuePlayersList');
-        if (!container) return;
-        
-        if (players.length === 0) {
-            container.innerHTML = this.renderEmptyState();
-            return;
-        }
-
-        container.innerHTML = players
-            .map(player => this.renderPlayerChip(player))
-            .join('');
-    }
-
-    renderPlayerChip(player) {
-        const isSelected = this.selectedPlayers.has(player.id);
-        const isFull = this.selectedPlayers.size >= 4;
-        const disabledClass = (!isSelected && isFull) ? 'disabled' : '';
-        
-        const statusLabel = player.status === 'playing' ? '🎮 In Game' : 
-                          player.status === 'queued' ? '⏳ In Queue' : '';
-        
-        return `
-            <div class="player-chip ${isSelected ? 'selected' : ''} ${disabledClass}" 
-                 data-player-id="${player.id}">
-                <div class="player-info">
-                    <span class="player-name">${player.name}</span>
-                    <div class="player-stats">
-                        <span class="games-played">
-                            <i class="fas fa-trophy"></i>
-                            ${player.gamesPlayed} games
-                        </span>
-                        ${player.lastGameTime ? `
-                            <span class="last-game-time">
-                                <i class="fas fa-clock"></i>
-                                ${this.formatLastGameTime(player.lastGameTime)}
-                            </span>
-                        ` : ''}
-                        ${statusLabel ? `
-                            <span class="player-current-status">
-                                ${statusLabel}
-                            </span>
-                        ` : ''}
-                    </div>
-                </div>
-                <div class="selection-indicator">
-                    ${isSelected ? 'Selected' : 'Select'}
-                </div>
-                </div>
-        `;
-    }
-
-    renderEmptyState() {
-        return `
-            <div class="empty-state">
-                <i class="fas fa-users-slash"></i>
-                <p>No players found</p>
-                <span>Try adjusting your search</span>
-                </div>
-            `;
-    }
-
-    confirmSelection() {
-        if (this.selectedPlayers.size === 4 && this.currentCourt) {
-            const playerIds = Array.from(this.selectedPlayers);
-            this.gameManager.addToQueue(this.currentCourt.id, playerIds);
-            Toast.show('Players added to queue', Toast.types.SUCCESS);
-            this.hide();
-        } else {
-            Toast.show('Please select exactly 4 players', Toast.types.WARNING);
-        }
-    }
-
-    sortPlayers(criteria) {
-        let allPlayers = Array.from(this.gameManager.players.values());
-        
-        switch(criteria) {
-            case 'games':
-                allPlayers.sort((a, b) => b.gamesPlayed - a.gamesPlayed);
-                break;
-            case 'recent':
-                allPlayers.sort((a, b) => {
-                    if (!a.lastGameTime) return 1;
-                    if (!b.lastGameTime) return -1;
-                    return b.lastGameTime - a.lastGameTime;
-                });
-                break;
-            default: // 'name'
-                allPlayers.sort((a, b) => a.name.localeCompare(b.name));
-        }
-
-        this.renderPlayers(allPlayers);
-    }
-
-    filterPlayers(searchTerm) {
-        const players = Array.from(this.gameManager.players.values());
-        const filtered = players.filter(player => 
-            player.name.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        
-        this.renderPlayers(filtered);
-    }
-
-    formatLastGameTime(timestamp) {
-        if (!timestamp) return null;
-        
-        const minutes = Math.floor((Date.now() - timestamp) / 60000);
-        
-        if (minutes < 60) {
-            return `${minutes}m ago`;
-        }
-        
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) {
-            return `${hours}h ago`;
-        }
-        
-        return `${Math.floor(hours / 24)}d ago`;
-    }
-
-    setGameManager(gameManager) {
-        this.gameManager = gameManager;
-        this.updateUI(); // Initial render
-    }
+// Usage examples:
+function handlePlayerAdded(name) {
+    Toast.show(Toast.messages.PLAYER_ADDED(name));
 }
 
-function renderQueueActionButtons(court) {
-    const container = court.querySelector('.queue-action-container');
-    container.innerHTML = `
-        <button class="add-to-queue-btn">
-            <i class="fas fa-plus"></i>
-            Add to Queue
-        </button>
-        ${court.classList.contains('active') ? `
-            <button class="complete-game-btn">
-                <i class="fas fa-flag-checkered"></i>
-                Complete Game
-            </button>
-        ` : ''}
-    `;
+function handleNetworkChange(online) {
+    Toast.show(online ? Toast.messages.NETWORK_ONLINE : Toast.messages.NETWORK_OFFLINE);
+}
+
+function handleError(action) {
+    const errorMessage = Toast.messages[`ERROR_${action.toUpperCase()}`] || 
+                        Toast.messages.ERROR_GENERIC;
+    Toast.show(errorMessage);
 }
 
 // Register Service Worker
@@ -2109,13 +2036,13 @@ if ('serviceWorker' in navigator) {
 
 // After your existing service worker registration code
 window.addEventListener('online', () => {
-    Toast.show('Back online', Toast.types.SUCCESS);
+    Toast.show('📶 Connected to network', Toast.types.SUCCESS);
     // Sync any pending changes
     syncPendingChanges();
 });
 
 window.addEventListener('offline', () => {
-    Toast.show('Working offline', Toast.types.INFO);
+    Toast.show('📴 Working offline - Changes will sync when connected', Toast.types.INFO);
 });
 
 // Function to handle pending changes when offline
