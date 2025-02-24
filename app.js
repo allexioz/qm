@@ -875,9 +875,9 @@ function generateCourtGradient() {
     const palette = palettes[Math.floor(Math.random() * palettes.length)];
     
     // Varied saturation and lightness for more interest
-    const color1 = `hsl(${palette.h1}, ${45 + Math.random() * 5}%, ${73 + Math.random() * 5}%)`;
-    const color2 = `hsl(${palette.h2}, ${40 + Math.random() * 5}%, ${80 + Math.random() * 4}%)`;
-    const color3 = `hsl(${palette.h3}, ${42 + Math.random() * 5}%, ${76 + Math.random() * 4}%)`;
+    const color1 = `hsl(${palette.h1}, ${75 + Math.random() * 5}%, ${60 + Math.random() * 5}%)`;
+    const color2 = `hsl(${palette.h2}, ${70 + Math.random() * 5}%, ${70 + Math.random() * 4}%)`;
+    const color3 = `hsl(${palette.h3}, ${52 + Math.random() * 5}%, ${62 + Math.random() * 4}%)`;
     
     return {
         gradient1: color1,

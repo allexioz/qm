@@ -249,8 +249,19 @@ body {
     display: grid;
     gap: var(--spacing-lg);
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    max-width: 1200px; /* Optional: prevent cards from getting too wide */
-    margin: 0 auto; /* Optional: center the container */
+    max-width: 1200px;
+    margin: 0 auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling for iOS */
+    scroll-snap-type: x mandatory; /* Enable snap points */
+    scroll-behavior: smooth; /* Smooth scrolling animation */
+    scrollbar-width: none; /* Hide scrollbar for Firefox */
+    -ms-overflow-style: none; /* Hide scrollbar for IE/Edge */
+}
+
+/* Hide scrollbar for Chrome/Safari */
+.courts-container::-webkit-scrollbar {
+    display: none;
 }
 
 .court-2d {
@@ -261,6 +272,7 @@ body {
     flex-direction: column;
     border-radius: 24px;
     overflow: hidden;
+    margin-bottom: 10px;
     background: 
         /* Corner shadows */
         radial-gradient(
@@ -295,6 +307,10 @@ body {
     box-shadow: 
         0 8px 24px rgba(0, 0, 0, 0.12),
         inset 0 2px 4px rgba(255, 255, 255, 0.25);
+    touch-action: manipulation; /* Optimize for touch */
+    -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
+    transform: translateZ(0); /* Enable hardware acceleration */
+    will-change: transform; /* Optimize animations */
 }
 
 .court-simulation {
@@ -315,6 +331,12 @@ body {
     -webkit-backdrop-filter: blur(8px);
 }
 
+@media (max-width: 768px) {
+    .court-actions {
+        margin-bottom: 0px !important;
+    }
+}
+
 .court-header {
     display: flex;
     align-items: center;
@@ -332,7 +354,7 @@ body {
     display: flex;
     align-items: center;
     gap: 4px;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 1);
     padding: 4px 8px;
     border-radius: 12px;
     font-size: 0.8em;
@@ -396,7 +418,7 @@ body {
 
 .service-court {
     position: absolute;
-    width: 25%;
+    width: 15%;
     height: 35%;
     border: 1px dashed rgba(255, 255, 255, 0.75);
 }
@@ -426,8 +448,9 @@ body {
     top: 50%;
     left: 0;
     right: 0;
-    height: 4px;
+    height: 2px;
     background: white;
+    
     transform: translateY(-50%);
 }
 
@@ -436,10 +459,11 @@ body {
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 12px;
-    height: 12px;
+    width: 0;
+    height: 0;
     background: white;
     border-radius: 50%;
+    
 }
 
 .team-section {
@@ -515,9 +539,38 @@ body {
         padding: 4px 6px;
     }
 
+    .courts-container {
+        grid-template-columns: 90vw; /* Single column for mobile */
+        padding: var(--spacing-md);
+        gap: var(--spacing-md);
+        padding: 0px;
+    }
+
     .court-2d {
-        aspect-ratio: 1 / 1.5; /* Keep same aspect ratio on mobile */
-        max-height: none; /* Remove max-height restriction */
+        aspect-ratio: 3/4; /* More compact ratio for mobile */
+        scroll-snap-align: center; /* Snap points for each court */
+        scroll-snap-stop: always; /* Force stopping at snap points */
+        touch-action: pan-x; /* Enable horizontal pan gesture */
+    }
+}
+
+/* Tablet-specific optimizations */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .courts-container {
+        padding: 0px;
+        grid-template-columns: repeat(2, calc(50% - var(--spacing-md))); /* Two columns for tablet */
+    }
+
+    .court-2d {
+        aspect-ratio: 3/5; /* Balanced ratio for tablets */
+        scroll-snap-align: center;
+    }
+}
+
+/* Add momentum-based scrolling for iOS devices */
+@supports (-webkit-touch-callout: none) {
+    .courts-container {
+        -webkit-overflow-scrolling: touch;
     }
 }
 
@@ -1129,7 +1182,8 @@ body {
 
 /* Add transition for status changes */
 .court-2d {
-    transition: all 0.3s ease;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .team-section {
@@ -1238,7 +1292,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    
 }
 
 /* Add margin to complete game button */
@@ -1955,5 +2009,23 @@ body {
     /* Add some spacing between the header and import section */
     .mobile-players-content .sidebar-header {
         margin-bottom: var(--spacing-md);
+    }
+}
+
+/* Add momentum scrolling for iOS devices */
+@supports (-webkit-touch-callout: none) {
+    .courts-container {
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Add subtle parallax effect during scroll */
+@media (max-width: 1024px) {
+    .court-2d .court-lines {
+        transition: transform 0.2s ease-out;
+    }
+
+    .courts-container:active .court-2d .court-lines {
+        transform: scale(0.98);
     }
 } 
