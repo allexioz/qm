@@ -4,7 +4,7 @@
 Badminon Queueing App enables a badminton queue master to manage players and courts efficiently, ensuring every player receives adequate court time.
 
 ## Technical Requirements
-- **Languages & Technologies:** Vanilla JavaScript, HTML5, CSS3
+- **Languages & Technologies:** Vanilla JavaScript, HTML5, CSS3, PWA
 - **Icons:** Fontawesome
 - **Storage:** Browser’s native local storage API for state persistence
 

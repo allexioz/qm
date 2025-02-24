@@ -2093,3 +2093,49 @@ function renderQueueActionButtons(court) {
         ` : ''}
     `;
 }
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+                console.log('ServiceWorker registration successful');
+            })
+            .catch(err => {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+    });
+}
+
+// After your existing service worker registration code
+window.addEventListener('online', () => {
+    Toast.show('Back online', Toast.types.SUCCESS);
+    // Sync any pending changes
+    syncPendingChanges();
+});
+
+window.addEventListener('offline', () => {
+    Toast.show('Working offline', Toast.types.INFO);
+});
+
+// Function to handle pending changes when offline
+function syncPendingChanges() {
+    const pendingChanges = localStorage.getItem('pendingChanges');
+    if (pendingChanges) {
+        try {
+            const changes = JSON.parse(pendingChanges);
+            // Process pending changes here
+            localStorage.removeItem('pendingChanges');
+        } catch (error) {
+            console.error('Error syncing pending changes:', error);
+        }
+    }
+}
+
+// Add beforeinstallprompt handler for custom install prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Optionally show your own install button/prompt
+});

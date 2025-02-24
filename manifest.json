@@ -1,0 +1,27 @@
+{
+    "name": "Badminton Queue Manager",
+    "short_name": "Queue Manager",
+    "description": "Manage badminton court queues and players",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#F2F2F7",
+    "theme_color": "#007AFF",
+    "icons": [
+        {
+            "src": "icons/icon.svg",
+            "type": "image/svg+xml",
+            "sizes": "any",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+} 
