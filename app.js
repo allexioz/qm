@@ -2175,48 +2175,65 @@ function renderQueueActionButtons(court) {
 }
 
 // Add at the start of your initialization code
-const APP_VERSION = '1.0.0'; // Match this with CACHE_VERSION in sw.js
+const APP_VERSION = '1.0.1'; // Match with CACHE_VERSION in sw.js
 
-// Register Service Worker with version check
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', async () => {
-        try {
-            const registration = await navigator.serviceWorker.register('/sw.js');
+// Add version checking on load
+async function checkVersion() {
+    try {
+        const response = await fetch(`version.json?t=${Date.now()}`);
+        const { version } = await response.json();
+        
+        if (version !== APP_VERSION) {
+            // Clear all caches
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                await Promise.all(
+                    cacheNames.map(cacheName => caches.delete(cacheName))
+                );
+            }
             
-            // Check for updates
-            registration.addEventListener('updatefound', () => {
-                const newWorker = registration.installing;
-                
-                newWorker.addEventListener('statechange', () => {
-                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        // New version available
-                        Toast.show('New version available! Refresh to update.', Toast.types.INFO);
-                        
-                        // Add refresh button to toast
-                        const refreshButton = document.createElement('button');
-                        refreshButton.textContent = 'Refresh Now';
-                        refreshButton.onclick = () => window.location.reload();
-                        document.querySelector('.toast-container').appendChild(refreshButton);
-                    }
-                });
-            });
-
-            // Force update check on load
-            registration.update();
+            // Clear localStorage
+            localStorage.clear();
             
-            console.log('ServiceWorker registered successfully');
-        } catch (err) {
-            console.error('ServiceWorker registration failed: ', err);
+            // Unregister service worker
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(
+                    registrations.map(registration => registration.unregister())
+                );
+            }
+            
+            // Force reload from server
+            window.location.reload(true);
         }
-    });
+    } catch (error) {
+        console.error('Version check failed:', error);
+    }
 }
 
-// Add periodic update checks
-setInterval(() => {
-    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
-    }
-}, 60 * 60 * 1000); // Check every hour
+// Check version on load and periodically
+window.addEventListener('load', checkVersion);
+setInterval(checkVersion, 5 * 60 * 1000); // Check every 5 minutes
+
+// Add reload button to UI
+function addReloadButton() {
+    const button = document.createElement('button');
+    button.textContent = '🔄 Force Refresh';
+    button.className = 'force-refresh-btn';
+    button.onclick = async () => {
+        // Clear all browser caches
+        if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(
+                cacheNames.map(cacheName => caches.delete(cacheName))
+            );
+        }
+        
+        // Force reload from server
+        window.location.reload(true);
+    };
+    document.body.appendChild(button);
+}
 
 // After your existing service worker registration code
 window.addEventListener('online', () => {
