@@ -2155,4 +2155,19 @@ body {
     .views-container {
         padding-bottom: calc(60px + env(safe-area-inset-bottom));
     }
+}
+
+/* Prevent zoom on mobile inputs */
+#playerImport,
+#mobilePlayerImport {
+    font-size: 16px; /* Minimum font size to prevent iOS zoom */
+    max-height: 150px;
+}
+
+@media (max-width: 768px) {
+    #playerImport,
+    #mobilePlayerImport {
+        font-size: 16px !important; /* Force minimum font size */
+        -webkit-text-size-adjust: 100%; /* Prevent iOS font scaling */
+    }
 } 
