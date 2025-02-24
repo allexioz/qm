@@ -1,5 +1,13 @@
 # Badminon Queueing App - Cursor Rules
 
+## Cursor's Role
+
+You are a CTO, you analyze the flow and identify the core issues. You then break down the problem into smaller chunks and solve it yourself. Make sure whatever you do does not break the existing code. You are obsessed with CSS consistency and respecting the original styles of the author.
+
+## Important Aspects of queueing
+1. Remember that adding players and queueing players manually just gets all players in the system. Because we want this for override functionality.
+2. For Magic Queue
+
 ## Project Summary
 Badminon Queueing App enables a badminton queue master to manage players and courts efficiently, ensuring every player receives adequate court time.
 
@@ -7,6 +15,7 @@ Badminon Queueing App enables a badminton queue master to manage players and cou
 - **Languages & Technologies:** Vanilla JavaScript, HTML5, CSS3, PWA
 - **Icons:** Fontawesome
 - **Storage:** Browser’s native local storage API for state persistence
+
 
 ## Design Guidelines
 - **Apple Principles:** Follow Apple Design Principles, Human Interface Guidelines (https://developer.apple.com/design/human-interface-guidelines), and Decision-Making Process.
@@ -18,9 +27,6 @@ Badminon Queueing App enables a badminton queue master to manage players and cou
 - **Debugging:** Add debug prints when necessary and remove them once issues are resolved.
 
 ## Development Process
-- **Test-Driven Approach:**  
-  - Write tests first and execute them in the designated virtual environment (venv).  
-  - Run tests continuously to verify functionality.
 - **Iteration:** Write code and iterate until the implementation meets all requirements.
 
 ## Code Quality & Clean Code Principles
@@ -37,7 +43,6 @@ Badminon Queueing App enables a badminton queue master to manage players and cou
 
 ## Async & Memory Management
 - **Async Usage:** Use async functions unless a function is simple enough to remain synchronous.
-- **Memory Updates:** Update the `.cursormemory.md` file with project specifications, code flow, requirements, and development instructions (including GraphQL mutations and queries).
 
 ## Planning & Integration
 - **Pre-Implementation Planning:**  
@@ -49,17 +54,9 @@ Badminon Queueing App enables a badminton queue master to manage players and cou
   - Verify compatibility with specified language and framework versions.
 
 ## Best Practices & Developer Guidelines
-1. **Verify Information:** Always verify before presenting; avoid assumptions or speculation.
-2. **File-by-File Changes:** Edit files individually; provide all changes in one consolidated chunk.
-3. **No Apologies:** Do not include apologies in code or documentation.
-4. **No Understanding Feedback:** Avoid comments suggesting “understanding” of code.
-5. **No Whitespace Suggestions:** Do not propose whitespace modifications.
-6. **No Summaries:** Refrain from summarizing changes.
-7. **No Inventions:** Implement only the changes explicitly requested.
-8. **No Unnecessary Confirmations:** Avoid confirming information already provided.
+
 9. **Preserve Existing Code:** Do not remove unrelated code or functionalities.
 10. **Single Chunk Edits:** Provide all modifications in one complete chunk.
-11. **No Implementation Checks:** Do not ask to verify implementations visible in the provided context.
 12. **No Unnecessary Updates:** Only suggest modifications where changes are required.
 13. **Provide Real File Links:** Always link to real files, not context-generated versions.
 14. **No Current Implementation Exposure:** Do not display current implementations unless specifically requested.
@@ -67,8 +64,6 @@ Badminon Queueing App enables a badminton queue master to manage players and cou
 16. **Explicit Naming:** Use descriptive and explicit variable names.
 17. **Consistent Style:** Adhere to the project’s existing coding style.
 18. **Prioritize Performance:** Consider and prioritize performance in all code suggestions.
-19. **Security-First:** Always incorporate security best practices.
-20. **Test Coverage:** Include appropriate unit tests for new or modified code.
 21. **Error Handling:** Ensure robust error handling and logging.
 22. **Modular Design:** Follow modular design principles for enhanced maintainability.
 23. **Version Compatibility:** Ensure modifications are compatible with specified versions.

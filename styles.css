@@ -1213,10 +1213,11 @@ body {
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: 12px;
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: none;
     width: 100%;
     margin-bottom: 10px;
     max-width: none;
+    height: 40px;
 }
 
 .start-game-btn:hover {
@@ -1370,11 +1371,11 @@ body {
     margin-top: var(--spacing-md);
 }
 
+/* Update queue button styles */
 .add-to-queue-btn {
-    flex: 1;
-    height: 40px;
+    height: 40px !important; /* Force height with !important to override any conflicts */
     padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: 8px;
+    border-radius: 12px;
     background: rgba(0, 0, 0, 0.04);
     border: none;
     color: #333;
@@ -1411,7 +1412,6 @@ body {
 /* Consistent button styles */
 .court-button {
     width: 100%;
-    height: 40px;
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: 8px;
     border: none;
@@ -1500,6 +1500,7 @@ body {
     background: rgba(0, 0, 0, 0.04);
     color: #333;
     border: none;
+    height: 40px;
     font-size: 0.9em;
     font-weight: 500;
     display: flex;
@@ -2242,4 +2243,29 @@ body {
     border: none;
     font-size: 16px;
     cursor: pointer;
+}
+
+.magic-queue-btn {
+    background: rgba(0, 0, 0, 0.04);
+    color: #333;
+    border: none;
+    font-size: 0.9em;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 12px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.magic-queue-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.magic-queue-btn i {
+    color: #666666;
 } 

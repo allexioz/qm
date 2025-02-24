@@ -10,7 +10,7 @@
     <!-- Add iOS specific meta tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Queue Manager">
+    <meta name="apple-mobile-web-app-title" content="Queue Master">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <!-- Add splash screen images for iOS -->
@@ -79,10 +79,10 @@
             </div>
         </div>
     </div>
-    <div class="modal" id="quickAddModal">
+    <div id="quickAddModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Quick Add Players</h3>
+                <h3>Add to Court</h3>
                 <button class="close-btn">×</button>
             </div>
             <div class="modal-body">
@@ -97,22 +97,22 @@
                     </div>
                     <div class="search-container">
                         <input type="text" 
-                               id="playerSearchInput" 
+                               id="quickAddSearchInput" 
                                placeholder="Search players..." 
                                class="player-search-input"
                                autocomplete="off">
                     </div>
-                    <div class="players-grid" id="availablePlayersList">
-                        <!-- Players will be added here -->
+                    <div class="selected-count">
+                        <span>Selected Players (0/4)</span>
                     </div>
-                </div>
-                <div class="selected-count">
-                    <span>Selected Players (0/4)</span>
+                    <div class="players-grid" id="quickAddPlayersList">
+                        <!-- Players will be rendered here -->
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="modal-btn secondary" id="cancelQuickAdd">Cancel</button>
-                <button class="modal-btn primary" id="confirmQuickAdd">Assign</button>
+                <button class="modal-btn primary" id="confirmQuickAdd">Add to Court</button>
             </div>
         </div>
     </div>
