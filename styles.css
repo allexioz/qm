@@ -1249,30 +1249,64 @@ body {
 /* Toast System */
 .toast-container {
     position: fixed;
-    top: 20px;
-    right: 20px;
     z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    padding: var(--spacing-md);
+    pointer-events: none;
 }
 
+/* Desktop positioning (bottom) */
+@media (min-width: 769px) {
+    .toast-container {
+        bottom: 0;
+        right: 0;
+    }
+
+    .toast {
+        transform: translateY(100%);
+    }
+
+    .toast.show {
+        transform: translateY(0);
+    }
+}
+
+/* Mobile positioning (top) */
+@media (max-width: 768px) {
+    .toast-container {
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: max(env(safe-area-inset-top), var(--spacing-md)); /* Account for notch */
+    }
+
+    .toast {
+        transform: translateY(-100%);
+        width: calc(100% - var(--spacing-md) * 2);
+        max-width: 400px;
+    }
+
+    .toast.show {
+        transform: translateY(0);
+    }
+}
+
+/* Toast styling */
 .toast {
-    min-width: 250px;
-    padding: 12px 16px;
-    border-radius: 8px;
     background: white;
+    border-radius: 12px;
+    padding: var(--spacing-md);
+    margin-top: var(--spacing-sm);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     display: flex;
     align-items: center;
-    gap: 8px;
-    transform: translateX(120%);
-    transition: transform 0.3s ease;
-    cursor: default;
-}
-
-.toast.show {
-    transform: translateX(0);
+    gap: var(--spacing-sm);
+    pointer-events: auto;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .toast i {
@@ -1292,26 +1326,6 @@ body {
 .toast-info {
     background: var(--primary-color);
     color: white;
-}
-
-/* Mobile optimization */
-@media (max-width: 768px) {
-    .toast-container {
-        top: auto;
-        bottom: calc(60px + env(safe-area-inset-bottom));
-        left: 50%;
-        transform: translateX(-50%);
-        width: calc(100% - 32px);
-    }
-
-    .toast {
-        width: 100%;
-        transform: translateY(120%);
-    }
-
-    .toast.show {
-        transform: translateY(0);
-    }
 }
 
 /* Add queue button styles */
@@ -2160,14 +2174,16 @@ body {
 /* Prevent zoom on mobile inputs */
 #playerImport,
 #mobilePlayerImport {
-    font-size: 16px; /* Minimum font size to prevent iOS zoom */
+    font-size: 16px;
     max-height: 150px;
+    touch-action: manipulation; /* Prevent double-tap zoom */
 }
 
 @media (max-width: 768px) {
     #playerImport,
     #mobilePlayerImport {
-        font-size: 16px !important; /* Force minimum font size */
-        -webkit-text-size-adjust: 100%; /* Prevent iOS font scaling */
+        font-size: 16px !important;
+        -webkit-text-size-adjust: none; /* Change from 100% to none */
+        touch-action: pan-x pan-y; /* Allow scrolling but prevent zoom */
     }
 } 
