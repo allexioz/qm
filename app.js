@@ -2256,11 +2256,12 @@ const APP_VERSION = '1.0.1'; // Match with CACHE_VERSION in sw.js
 // Version checking
 async function checkVersion() {
     try {
+        // Add cache-busting query parameter only to version check
         const response = await fetch(`version.json?t=${Date.now()}`);
-        if (!response.ok) throw new Error('Version check failed');
+        if (!response.ok) return;
         
-        const { version, buildTime } = await response.json();
-        const currentVersion = '1.0.1'; // Match with CACHE_VERSION in sw.js
+        const { version } = await response.json();
+        const currentVersion = '1.0.1';
         
         if (version !== currentVersion) {
             console.log('New version detected:', version);
@@ -2271,26 +2272,29 @@ async function checkVersion() {
                 await Promise.all(cacheNames.map(name => caches.delete(name)));
             }
             
-            // Clear localStorage
-            localStorage.clear();
-            
             // Unregister service worker
             if ('serviceWorker' in navigator) {
                 const registrations = await navigator.serviceWorker.getRegistrations();
                 await Promise.all(registrations.map(r => r.unregister()));
             }
             
-            // Force reload
-            window.location.reload(true);
+            // Reload only once
+            if (!sessionStorage.getItem('reloading')) {
+                sessionStorage.setItem('reloading', 'true');
+                window.location.reload();
+            }
+        } else {
+            // Clear reload flag if versions match
+            sessionStorage.removeItem('reloading');
         }
     } catch (error) {
         console.error('Version check failed:', error);
     }
 }
 
-// Check version on load and periodically
+// Check version less frequently
 window.addEventListener('load', checkVersion);
-setInterval(checkVersion, 5 * 60 * 1000); // Check every 5 minutes
+setInterval(checkVersion, 60 * 60 * 1000); // Check every hour instead of every 5 minutes
 
 // Add reload button to UI
 function addReloadButton() {
