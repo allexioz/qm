@@ -656,13 +656,12 @@ body {
 }
 
 .court-2d:hover {
-    transform: translateY(-4px) scale(1.01);
+    transform: none;
     box-shadow: 
-        0 20px 40px rgba(0, 0, 0, 0.12),
-        0 8px 16px rgba(0, 0, 0, 0.06),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-    cursor: pointer;
-    transition: all 0.2s ease;
+        0 8px 24px rgba(0, 0, 0, 0.12),
+        inset 0 2px 4px rgba(255, 255, 255, 0.25);
+    cursor: default;
+    transition: none;
 }
 
 /* Update empty state styles */
@@ -2115,5 +2114,14 @@ body {
         width: 100%;
         max-width: 100%;
         box-sizing: border-box;
+    }
+
+    /* Remove parallax effect on mobile */
+    .courts-container:active .court-2d .court-lines {
+        transform: none;
+    }
+
+    .court-2d .court-lines {
+        transition: none;
     }
 } 
