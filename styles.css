@@ -245,23 +245,25 @@ body {
 }
 
 .courts-container {
-    padding: var(--spacing-lg);
     display: grid;
-    gap: var(--spacing-lg);
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    max-width: 1200px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    max-width: 1600px; /* Increased to accommodate more courts */
     margin: 0 auto;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling for iOS */
-    scroll-snap-type: x mandatory; /* Enable snap points */
-    scroll-behavior: smooth; /* Smooth scrolling animation */
-    scrollbar-width: none; /* Hide scrollbar for Firefox */
-    -ms-overflow-style: none; /* Hide scrollbar for IE/Edge */
 }
 
-/* Hide scrollbar for Chrome/Safari */
-.courts-container::-webkit-scrollbar {
-    display: none;
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .courts-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .courts-container {
+        grid-template-columns: 1fr;
+    }
 }
 
 .court-2d {

@@ -1,40 +1,43 @@
-const CACHE_VERSION = '1.0.1'; // Increment this for each deployment
-const CACHE_NAME = `badminton-queue-${CACHE_VERSION}`;
+const CACHE_VERSION = '1.0.1';
+const BUILD_TIME = new Date().getTime();
+const CACHE_NAME = `badminton-queue-${CACHE_VERSION}-${BUILD_TIME}`;
 
-// Add timestamp to cache name for Safari
-const TIMESTAMP = new Date().getTime();
-const RUNTIME_CACHE = `runtime-${CACHE_VERSION}-${TIMESTAMP}`;
+// Add cache-busting query parameter to all cached URLs
+function addCacheBuster(url) {
+    const bustedUrl = new URL(url, self.location.href);
+    bustedUrl.searchParams.set('v', `${CACHE_VERSION}-${BUILD_TIME}`);
+    return bustedUrl.toString();
+}
 
+// Cache assets with cache busters
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
     '/styles.css',
     '/app.js',
     '/manifest.json',
+    '/version.json',
     '/icons/icon.svg',
     '/icons/icon-192x192.png',
     '/icons/icon-512x512.png',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css',
     '/offline.html'
-];
+].map(url => addCacheBuster(url));
 
 // Install service worker and cache assets
 self.addEventListener('install', (event) => {
     event.waitUntil(
         Promise.all([
-            // Clear all caches first
+            // Clear all existing caches
             caches.keys().then(cacheNames => {
                 return Promise.all(
                     cacheNames.map(cache => caches.delete(cache))
                 );
             }),
-            // Then cache new assets
-            caches.open(CACHE_NAME).then((cache) => {
+            // Cache new assets with cache busters
+            caches.open(CACHE_NAME).then(cache => {
                 console.log('Caching app shell');
-                return cache.addAll(ASSETS_TO_CACHE.map(url => {
-                    // Add cache-busting query parameter
-                    return `${url}${url.includes('?') ? '&' : '?'}v=${CACHE_VERSION}-${TIMESTAMP}`;
-                }));
+                return cache.addAll(ASSETS_TO_CACHE);
             })
         ])
     );
@@ -66,27 +69,22 @@ self.addEventListener('activate', (event) => {
 
 // Enhanced fetch handler with network-first strategy for API calls
 self.addEventListener('fetch', (event) => {
-    // Add version to all requests
-    const url = new URL(event.request.url);
-    if (!url.pathname.startsWith('/api/')) {
-        url.searchParams.set('v', CACHE_VERSION + '-' + TIMESTAMP);
+    // Add cache buster to non-API requests
+    if (!event.request.url.includes('/api/')) {
+        const bustUrl = addCacheBuster(event.request.url);
+        event.respondWith(
+            fetch(bustUrl)
+                .then(response => {
+                    // Clone and cache the fresh response
+                    const responseToCache = response.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseToCache);
+                    });
+                    return response;
+                })
+                .catch(() => {
+                    return caches.match(event.request);
+                })
+        );
     }
-
-    event.respondWith(
-        fetch(event.request)
-            .then(response => {
-                // Clone the response
-                const responseToCache = response.clone();
-
-                // Update cache
-                caches.open(RUNTIME_CACHE).then(cache => {
-                    cache.put(event.request, responseToCache);
-                });
-
-                return response;
-            })
-            .catch(() => {
-                return caches.match(event.request);
-            })
-    );
 }); 

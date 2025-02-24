@@ -23,6 +23,26 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <script src="app.js?v=1.0.1" defer></script>
+    <!-- Force reload for Safari -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', async () => {
+                try {
+                    // Unregister old service worker
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map(r => r.unregister()));
+                    
+                    // Register new service worker
+                    await navigator.serviceWorker.register('/sw.js?v=1.0.1');
+                    
+                    // Force reload after registration
+                    window.location.reload(true);
+                } catch (error) {
+                    console.error('Service worker registration failed:', error);
+                }
+            });
+        }
+    </script>
 </head>
 <body>
     <div class="mobile-tabs">

@@ -333,8 +333,15 @@ class GameManager {
         console.group('🎮 Initializing GameManager');
         this.storage = storage;
         this.eventBus = eventBus;
-        this.courts = new Map();
         this.players = new Map();
+        this.courts = new Map();
+        
+        // Initialize 5 courts
+        ['court-1', 'court-2', 'court-3', 'court-4', 'court-5'].forEach(id => {
+            this.courts.set(id, new Court(id));
+        });
+        
+        this.loadState();
         
         // First register event handlers
         this.registerEventHandlers();
@@ -379,7 +386,7 @@ class GameManager {
         });
 
         // Initialize courts with proper time restoration
-        ['court-1', 'court-2'].forEach(courtId => {
+        ['court-1', 'court-2', 'court-3', 'court-4', 'court-5'].forEach(courtId => {
             console.log(`Initializing court: ${courtId}`);
             const courtData = state.courts[courtId];
             const court = courtData ? Court.fromJSON(courtData) : new Court(courtId);
@@ -824,7 +831,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const courtsContainer = document.querySelector('.courts-container');
     const courtViews = new Map();
     
-    ['court-1', 'court-2'].forEach(courtId => {
+    // Create 5 courts instead of 2
+    ['court-1', 'court-2', 'court-3', 'court-4', 'court-5'].forEach(courtId => {
         try {
             const court = gameManager.courts.get(courtId);
             const courtView = new CourtView(court, gameManager, eventBus);
@@ -961,15 +969,49 @@ function generateCourtGradient() {
         { h1: 185, h2: 180, h3: 183 },  // Shallow waters
         { h1: 200, h2: 195, h3: 198 },  // Deep blue
         { h1: 170, h2: 165, h3: 168 },  // Coral reef
-        { h1: 210, h2: 205, h3: 208 }   // Ocean abyss
+        { h1: 210, h2: 205, h3: 208 },   // Ocean abyss
+
+        // Neon Dreams
+        { h1: 300, h2: 280, h3: 290 },  // Electric purple
+        { h1: 160, h2: 140, h3: 150 },  // Cyber mint
+        { h1: 190, h2: 210, h3: 200 },  // Digital blue
+        { h1: 330, h2: 310, h3: 320 },  // Neon pink
+
+        // Earth Tones 2024
+        { h1: 25, h2: 35, h3: 30 },     // Terra cotta
+        { h1: 45, h2: 55, h3: 50 },     // Desert sand
+        { h1: 15, h2: 25, h3: 20 },     // Clay brown
+        { h1: 35, h2: 45, h3: 40 },     // Warm ochre
+
+        // Nordic Lights
+        { h1: 220, h2: 240, h3: 230 },  // Aurora blue
+        { h1: 180, h2: 200, h3: 190 },  // Nordic ice
+
+        // Retro Wave
+        { h1: 315, h2: 295, h3: 305 },  // Synthwave pink
+        { h1: 250, h2: 230, h3: 240 },  // Retro purple
+        { h1: 190, h2: 170, h3: 180 },  // Cyber teal
+        { h1: 45, h2: 25, h3: 35 },     // Sunset gold
+
+        // Botanical Garden
+        { h1: 120, h2: 140, h3: 130 },  // Fresh leaf
+        { h1: 85, h2: 105, h3: 95 },    // Spring bud
+        { h1: 150, h2: 170, h3: 160 },  // Garden moss
+        { h1: 65, h2: 85, h3: 75 },     // Young bamboo
+
+        // Crystal Collection
+        { h1: 185, h2: 205, h3: 195 },  // Aquamarine
+        { h1: 280, h2: 300, h3: 290 },  // Amethyst
+        { h1: 45, h2: 65, h3: 55 },     // Citrine
+        { h1: 320, h2: 340, h3: 330 },  // Rose quartz
     ];
 
     const palette = palettes[Math.floor(Math.random() * palettes.length)];
     
-    // Varied saturation and lightness for more interest
-    const color1 = `hsl(${palette.h1}, ${75 + Math.random() * 5}%, ${60 + Math.random() * 5}%)`;
-    const color2 = `hsl(${palette.h2}, ${70 + Math.random() * 5}%, ${70 + Math.random() * 4}%)`;
-    const color3 = `hsl(${palette.h3}, ${52 + Math.random() * 5}%, ${62 + Math.random() * 4}%)`;
+    // Enhanced saturation and lightness variations for more vibrancy
+    const color1 = `hsl(${palette.h1}, ${10 + Math.random() * 10}%, ${65 + Math.random() * 5}%)`;
+    const color2 = `hsl(${palette.h2}, ${75 + Math.random() * 10}%, ${70 + Math.random() * 5}%)`;
+    const color3 = `hsl(${palette.h3}, ${90 + Math.random() * 10}%, ${67 + Math.random() * 5}%)`;
     
     return {
         gradient1: color1,
@@ -1082,15 +1124,49 @@ class CourtView {
             { h1: 185, h2: 180, h3: 183 },  // Shallow waters
             { h1: 200, h2: 195, h3: 198 },  // Deep blue
             { h1: 170, h2: 165, h3: 168 },  // Coral reef
-            { h1: 210, h2: 205, h3: 208 }   // Ocean abyss
+            { h1: 210, h2: 205, h3: 208 },   // Ocean abyss
+
+            // Neon Dreams
+            { h1: 300, h2: 280, h3: 290 },  // Electric purple
+            { h1: 160, h2: 140, h3: 150 },  // Cyber mint
+            { h1: 190, h2: 210, h3: 200 },  // Digital blue
+            { h1: 330, h2: 310, h3: 320 },  // Neon pink
+
+            // Earth Tones 2024
+            { h1: 25, h2: 35, h3: 30 },     // Terra cotta
+            { h1: 45, h2: 55, h3: 50 },     // Desert sand
+            { h1: 15, h2: 25, h3: 20 },     // Clay brown
+            { h1: 35, h2: 45, h3: 40 },     // Warm ochre
+
+            // Nordic Lights
+            { h1: 220, h2: 240, h3: 230 },  // Aurora blue
+            { h1: 180, h2: 200, h3: 190 },  // Nordic ice
+
+            // Retro Wave
+            { h1: 315, h2: 295, h3: 305 },  // Synthwave pink
+            { h1: 250, h2: 230, h3: 240 },  // Retro purple
+            { h1: 190, h2: 170, h3: 180 },  // Cyber teal
+            { h1: 45, h2: 25, h3: 35 },     // Sunset gold
+
+            // Botanical Garden
+            { h1: 120, h2: 140, h3: 130 },  // Fresh leaf
+            { h1: 85, h2: 105, h3: 95 },    // Spring bud
+            { h1: 150, h2: 170, h3: 160 },  // Garden moss
+            { h1: 65, h2: 85, h3: 75 },     // Young bamboo
+
+            // Crystal Collection
+            { h1: 185, h2: 205, h3: 195 },  // Aquamarine
+            { h1: 280, h2: 300, h3: 290 },  // Amethyst
+            { h1: 45, h2: 65, h3: 55 },     // Citrine
+            { h1: 320, h2: 340, h3: 330 },  // Rose quartz
         ];
 
         const palette = palettes[Math.floor(Math.random() * palettes.length)];
         
-        // Varied saturation and lightness for more interest
-        const color1 = `hsl(${palette.h1}, ${75 + Math.random() * 5}%, ${60 + Math.random() * 5}%)`;
-        const color2 = `hsl(${palette.h2}, ${70 + Math.random() * 5}%, ${70 + Math.random() * 4}%)`;
-        const color3 = `hsl(${palette.h3}, ${52 + Math.random() * 5}%, ${62 + Math.random() * 4}%)`;
+        // Enhanced saturation and lightness variations for more vibrancy
+        const color1 = `hsl(${palette.h1}, ${80 + Math.random() * 10}%, ${65 + Math.random() * 5}%)`;
+        const color2 = `hsl(${palette.h2}, ${75 + Math.random() * 10}%, ${70 + Math.random() * 5}%)`;
+        const color3 = `hsl(${palette.h3}, ${70 + Math.random() * 10}%, ${67 + Math.random() * 5}%)`;
         
         return {
             gradient1: color1,
@@ -2177,19 +2253,22 @@ function renderQueueActionButtons(court) {
 // Add at the start of your initialization code
 const APP_VERSION = '1.0.1'; // Match with CACHE_VERSION in sw.js
 
-// Add version checking on load
+// Version checking
 async function checkVersion() {
     try {
         const response = await fetch(`version.json?t=${Date.now()}`);
-        const { version } = await response.json();
+        if (!response.ok) throw new Error('Version check failed');
         
-        if (version !== APP_VERSION) {
-            // Clear all caches
+        const { version, buildTime } = await response.json();
+        const currentVersion = '1.0.1'; // Match with CACHE_VERSION in sw.js
+        
+        if (version !== currentVersion) {
+            console.log('New version detected:', version);
+            
+            // Clear caches
             if ('caches' in window) {
                 const cacheNames = await caches.keys();
-                await Promise.all(
-                    cacheNames.map(cacheName => caches.delete(cacheName))
-                );
+                await Promise.all(cacheNames.map(name => caches.delete(name)));
             }
             
             // Clear localStorage
@@ -2198,12 +2277,10 @@ async function checkVersion() {
             // Unregister service worker
             if ('serviceWorker' in navigator) {
                 const registrations = await navigator.serviceWorker.getRegistrations();
-                await Promise.all(
-                    registrations.map(registration => registration.unregister())
-                );
+                await Promise.all(registrations.map(r => r.unregister()));
             }
             
-            // Force reload from server
+            // Force reload
             window.location.reload(true);
         }
     } catch (error) {
