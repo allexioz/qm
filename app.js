@@ -121,6 +121,16 @@ class Court {
             this.timerId = null;
         }
 
+        // Update lastGameTime for all players in the current game
+        // But DON'T increment game count here - we'll do that in GameManager
+        const currentTime = Date.now();
+        this.players.forEach(player => {
+            player.lastGameTime = currentTime;
+            // Remove this line to avoid double counting
+            // player.gamesPlayed += 1;
+            player.status = 'resting'; // Set status to resting after game
+        });
+
         // Move next players from queue if available
         if (this.queue.length >= 4) {
             const nextPlayers = this.queue.splice(0, 4);
@@ -335,6 +345,7 @@ class GameManager {
         this.eventBus = eventBus;
         this.players = new Map();
         this.courts = new Map();
+        this.playerTimerManager = null; // Will be initialized later
         
         // Initialize 5 courts
         ['court-1', 'court-2', 'court-3', 'court-4', 'court-5'].forEach(id => {
@@ -349,10 +360,19 @@ class GameManager {
         // Then load state and emit initial events
         this.loadState();
         
+        // Initialize the player timer manager
+        this.initializePlayerTimerManager();
+        
         // Emit initial state events
         this.emitInitialState();
         
         console.groupEnd();
+    }
+
+    // Add this new method
+    initializePlayerTimerManager() {
+        console.log('Initializing PlayerTimerManager from GameManager');
+        this.playerTimerManager = new PlayerTimerManager(this, this.eventBus);
     }
 
     registerEventHandlers() {
@@ -648,22 +668,15 @@ class GameManager {
             const court = this.courts.get(courtId);
             if (!court) throw new Error(`Court ${courtId} not found`);
 
-            // For games started from queue, increment the count here
-            if (court.startedFromQueue) {
-                court.players.forEach(player => {
-                    const playerObj = this.players.get(player.id);
-                    if (playerObj) {
-                        playerObj.gamesPlayed++;
-                    }
-                });
-            }
-
-            // Update player statuses
-            court.players.forEach(player => {
-                const playerObj = this.players.get(player.id);
-                if (playerObj) {
-                    playerObj.status = 'resting';
-                    playerObj.lastGameTime = Date.now();
+            // Update player statuses and increment games count
+            court.players.forEach(playerId => {
+                const player = this.players.get(playerId);
+                if (player) {
+                    const oldStatus = player.status;
+                    player.status = 'resting';
+                    player.lastGameTime = Date.now();
+                    player.gamesPlayed++;
+                    console.log(`Player ${player.name}: ${oldStatus} -> ${player.status} (Games: ${player.gamesPlayed})`);
                 }
             });
 
@@ -709,39 +722,283 @@ class GameManager {
     }
 
     getMagicQueuePlayers(courtId) {
-        console.group('🎯 getMagicQueuePlayers');
+        console.group('✨ getMagicQueuePlayers');
         console.log('Court ID:', courtId);
 
-        // Get all players
+        // Get all available players
         const allPlayers = Array.from(this.players.values());
         console.log('Total players:', allPlayers.length);
 
-        // Sort players by priority
-        const sortedPlayers = allPlayers.sort((a, b) => {
-            // First priority: Players with 0 games
-            if (a.gamesPlayed === 0 && b.gamesPlayed > 0) return -1;
-            if (b.gamesPlayed === 0 && a.gamesPlayed > 0) return 1;
-
-            // Second priority: Time since last game
-            const aTime = a.lastGameTime || 0;
-            const bTime = b.lastGameTime || 0;
-            return aTime - bTime;
-        });
-
-        // Take top 4 players
-        const selectedPlayers = sortedPlayers.slice(0, 4);
-        console.log('Selected players:', selectedPlayers.map(p => p.name));
-
         // Check if we have enough players
-        if (selectedPlayers.length < 4) {
-            console.warn('Not enough players');
+        if (allPlayers.length < 4) {
+            console.warn('Not enough players for a game');
             console.groupEnd();
-            Toast.show('Not enough players for a game', Toast.types.WARNING);
+            Toast.show('Need at least 4 players for a game', Toast.types.WARNING);
             return null;
         }
 
+        // Step 1: Calculate player scores based on priority factors
+        const playerScores = this.calculatePlayerScores(allPlayers);
+        
+        // Step 2: Select top players with weighted randomness
+        const selectedPlayers = this.selectPlayersWithWeightedRandomness(playerScores);
+        
+        // Step 3: Form teams with consideration for teammate history
+        const teams = this.formBalancedTeams(selectedPlayers);
+        
+        // Flatten teams back into a single array for the court
+        const finalPlayers = [...teams.teamA, ...teams.teamB];
+        console.log('Final selected players:', finalPlayers.map(p => p.name));
+        
         console.groupEnd();
+        return finalPlayers;
+    }
+
+    // Calculate scores for each player based on priority factors
+    calculatePlayerScores(players) {
+        console.log('Calculating player scores...');
+        
+        // Get current timestamp for time-based calculations
+        const now = Date.now();
+        
+        // Find the max games played for normalization
+        const maxGamesPlayed = Math.max(...players.map(p => p.gamesPlayed), 1);
+        
+        // Calculate scores for each player
+        return players.map(player => {
+            // Base score starts at 100
+            let score = 100;
+            
+            // Factor 1: Players with 0 games get highest priority
+            if (player.gamesPlayed === 0) {
+                score += 200;
+            } else {
+                // Factor 2: Fewer games played = higher priority (inverse relationship)
+                // Normalize games played to a 0-100 scale and subtract from score
+                const gamesPlayedFactor = (player.gamesPlayed / maxGamesPlayed) * 100;
+                score -= gamesPlayedFactor;
+            }
+            
+            // Factor 3: Time since last game (longer = higher priority)
+            if (player.lastGameTime) {
+                const minutesSinceLastGame = (now - player.lastGameTime) / (1000 * 60);
+                // Add up to 100 points for players who haven't played in a while
+                // Caps at 100 points after 60 minutes (1 hour)
+                const timeFactor = Math.min(minutesSinceLastGame / 60, 1) * 100;
+                score += timeFactor;
+            } else {
+                // Never played before, add bonus (but less than 0 games bonus)
+                score += 150;
+            }
+            
+            // Factor 4: Current status affects priority
+            switch (player.status) {
+                case 'nogames':
+                    score += 50;
+                    break;
+                case 'waiting':
+                    score += 30;
+                    break;
+                case 'resting':
+                    // Recently played, lower priority
+                    score -= 20;
+                    break;
+                case 'playing':
+                    // Currently playing, lowest priority
+                    score -= 100;
+                    break;
+            }
+            
+            // Ensure score doesn't go negative
+            score = Math.max(score, 1);
+            
+            return {
+                player,
+                score: Math.round(score)
+            };
+        });
+    }
+
+    // Select players using weighted randomness based on scores
+    selectPlayersWithWeightedRandomness(playerScores) {
+        console.log('Selecting players with weighted randomness...');
+        
+        // Sort by score descending for logging purposes
+        const sortedScores = [...playerScores].sort((a, b) => b.score - a.score);
+        console.log('Player scores:', sortedScores.map(p => `${p.player.name}: ${p.score}`));
+        
+        // We need exactly 4 players
+        const selectedPlayers = [];
+        const totalPlayers = playerScores.length;
+        
+        // If we have exactly 4 players, just return them all
+        if (totalPlayers === 4) {
+            return playerScores.map(ps => ps.player);
+        }
+        
+        // Calculate total weight for weighted random selection
+        const totalWeight = playerScores.reduce((sum, p) => sum + p.score, 0);
+        
+        // Select 4 players with weighted randomness
+        const availablePlayers = [...playerScores];
+        
+        while (selectedPlayers.length < 4 && availablePlayers.length > 0) {
+            // Calculate current total weight of available players
+            const currentTotalWeight = availablePlayers.reduce((sum, p) => sum + p.score, 0);
+            
+            // Generate random value between 0 and total weight
+            const randomValue = Math.random() * currentTotalWeight;
+            
+            // Find the player that corresponds to this random value
+            let weightSum = 0;
+            let selectedIndex = -1;
+            
+            for (let i = 0; i < availablePlayers.length; i++) {
+                weightSum += availablePlayers[i].score;
+                if (randomValue <= weightSum) {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+            
+            // If we somehow didn't select anyone, just take the first available
+            if (selectedIndex === -1) {
+                selectedIndex = 0;
+            }
+            
+            // Add the selected player to our results
+            selectedPlayers.push(availablePlayers[selectedIndex].player);
+            
+            // Remove the selected player from available pool
+            availablePlayers.splice(selectedIndex, 1);
+        }
+        
+        console.log('Selected players:', selectedPlayers.map(p => p.name));
         return selectedPlayers;
+    }
+
+    // Form balanced teams considering teammate history
+    formBalancedTeams(players) {
+        console.log('Forming balanced teams...');
+        
+        // Create a map to track how often players have played together
+        const teammateHistory = this.getTeammateHistory();
+        
+        // Try different team combinations to find the most balanced one
+        const possibleTeams = this.generateTeamCombinations(players);
+        
+        // Score each team combination based on teammate history
+        const scoredTeams = possibleTeams.map(teams => {
+            const teamA = teams.teamA;
+            const teamB = teams.teamB;
+            
+            // Calculate "familiarity score" - how often these teammates have played together
+            const teamAFamiliarity = this.calculateTeamFamiliarity(teamA, teammateHistory);
+            const teamBFamiliarity = this.calculateTeamFamiliarity(teamB, teammateHistory);
+            
+            // We want to minimize familiarity to avoid teammate fatigue
+            const totalFamiliarity = teamAFamiliarity + teamBFamiliarity;
+            
+            return {
+                teams,
+                score: totalFamiliarity
+            };
+        });
+        
+        // Sort by score ascending (lower is better - less teammate fatigue)
+        scoredTeams.sort((a, b) => a.score - b.score);
+        
+        // Add some randomness - don't always pick the absolute best
+        // 70% chance to pick from top 3 combinations
+        const randomFactor = Math.random();
+        let selectedIndex = 0;
+        
+        if (randomFactor < 0.7 && scoredTeams.length >= 3) {
+            // Pick randomly from top 3
+            selectedIndex = Math.floor(Math.random() * 3);
+        }
+        
+        const selectedTeams = scoredTeams[selectedIndex].teams;
+        console.log('Team A:', selectedTeams.teamA.map(p => p.name));
+        console.log('Team B:', selectedTeams.teamB.map(p => p.name));
+        
+        return selectedTeams;
+    }
+
+    // Get history of how often players have played together
+    getTeammateHistory() {
+        // This would ideally come from a persistent data store
+        // For now, we'll derive it from game history if available
+        
+        // Create a map where keys are "playerId1:playerId2" and values are count
+        const teammateCount = new Map();
+        
+        // For each court that has had games
+        this.courts.forEach(court => {
+            // Skip courts with no players or fewer than 4 players
+            if (!court.players || court.players.length < 4) return;
+            
+            // Assume first two players are team A and last two are team B
+            // This is a simplification - in reality you'd track actual teams
+            const teamA = court.players.slice(0, 2);
+            const teamB = court.players.slice(2, 4);
+            
+            // Count teammate relationships
+            this.incrementTeammateCount(teamA[0], teamA[1], teammateCount);
+            this.incrementTeammateCount(teamB[0], teamB[1], teammateCount);
+        });
+        
+        return teammateCount;
+    }
+
+    // Helper to increment teammate count
+    incrementTeammateCount(player1, player2, countMap) {
+        if (!player1 || !player2) return;
+        
+        // Create a consistent key regardless of player order
+        const ids = [player1.id, player2.id].sort();
+        const key = ids.join(':');
+        
+        countMap.set(key, (countMap.get(key) || 0) + 1);
+    }
+
+    // Calculate how familiar a team is (how often they've played together)
+    calculateTeamFamiliarity(team, teammateHistory) {
+        if (team.length !== 2) return 0;
+        
+        // Get the teammate history count
+        const ids = [team[0].id, team[1].id].sort();
+        const key = ids.join(':');
+        
+        return teammateHistory.get(key) || 0;
+    }
+
+    // Generate all possible team combinations from 4 players
+    generateTeamCombinations(players) {
+        if (players.length !== 4) {
+            console.warn('Need exactly 4 players to generate team combinations');
+            // Return a default split if we don't have exactly 4 players
+            return [{
+                teamA: players.slice(0, 2),
+                teamB: players.slice(2, 4)
+            }];
+        }
+        
+        // There are 3 possible ways to split 4 players into 2 teams of 2
+        return [
+            {
+                teamA: [players[0], players[1]],
+                teamB: [players[2], players[3]]
+            },
+            {
+                teamA: [players[0], players[2]],
+                teamB: [players[1], players[3]]
+            },
+            {
+                teamA: [players[0], players[3]],
+                teamB: [players[1], players[2]]
+            }
+        ];
     }
 
     handleMagicQueue(courtId) {
@@ -764,11 +1021,12 @@ class GameManager {
         court.processingMagicQueue = true;
 
         try {
-            // Get the players using existing magic queue logic
+            // Get the players using our enhanced magic queue logic
             const players = this.getMagicQueuePlayers(courtId);
             if (!players) {
                 console.warn('No players returned from getMagicQueuePlayers');
                 console.groupEnd();
+                court.processingMagicQueue = false;
                 return;
             }
 
@@ -802,9 +1060,131 @@ class GameManager {
                 this.startGame(courtId);
                 Toast.show('✨ Game started!', Toast.types.SUCCESS);
             }
+        } catch (error) {
+            console.error('Error in Magic Queue:', error);
+            Toast.show('Error creating Magic Queue', Toast.types.ERROR);
         } finally {
             court.processingMagicQueue = false;
             console.groupEnd();
+        }
+    }
+
+    // Enhance the magic queue algorithm in the GameManager class
+    magicQueue() {
+        console.group('✨ Magic Queue Algorithm');
+        
+        try {
+            // Find an available court
+            const availableCourt = Array.from(this.courts.values())
+                .find(court => court.status === 'empty');
+            
+            if (!availableCourt) {
+                console.log('No available courts for magic queue');
+                Toast.show('No available courts', Toast.types.WARNING);
+                console.groupEnd();
+                return false;
+            }
+            
+            console.log('Found available court:', availableCourt.id);
+            
+            // Get all players
+            const allPlayers = Array.from(this.players.values());
+            if (allPlayers.length < 4) {
+                console.log('Not enough players for magic queue');
+                Toast.show('Need at least 4 players', Toast.types.WARNING);
+                console.groupEnd();
+                return false;
+            }
+            
+            // Mark court as processing to prevent multiple operations
+            availableCourt.processingMagicQueue = true;
+            
+            // Get players who are not already in this court's queue
+            const eligiblePlayers = allPlayers.filter(player => {
+                // Check if player is not already in this court's queue
+                const notInThisQueue = !availableCourt.queue.some(p => p.id === player.id);
+                
+                // NEW: Include players who are currently playing
+                // We'll prioritize them differently later
+                return notInThisQueue;
+            });
+            
+            console.log('Eligible players count:', eligiblePlayers.length);
+            
+            if (eligiblePlayers.length < 4) {
+                console.log('Not enough eligible players');
+                Toast.show('Not enough eligible players', Toast.types.WARNING);
+                availableCourt.processingMagicQueue = false;
+                console.groupEnd();
+                return false;
+            }
+            
+            // Score and sort players
+            const scoredPlayers = eligiblePlayers.map(player => {
+                let score = 0;
+                
+                // Base score is inverse of games played (fewer games = higher priority)
+                score += 100 - Math.min(player.gamesPlayed * 10, 90);
+                
+                // Time since last game (longer wait = higher priority)
+                if (player.lastGameTime) {
+                    const minutesSinceLastGame = (Date.now() - player.lastGameTime) / 60000;
+                    score += Math.min(minutesSinceLastGame, 60); // Cap at 60 minutes
+                } else {
+                    // Never played gets high priority
+                    score += 70;
+                }
+                
+                // NEW: Reduce priority for currently playing players
+                if (player.status === 'playing') {
+                    score -= 50; // Significant reduction but not impossible to be selected
+                }
+                
+                // NEW: Reduce priority for resting players
+                if (player.status === 'resting') {
+                    const minutesSinceLastGame = (Date.now() - player.lastGameTime) / 60000;
+                    const restingPenalty = Math.max(0, 10 - minutesSinceLastGame);
+                    score -= restingPenalty * 5; // Gradually reduce penalty as rest time increases
+                }
+                
+                // NEW: Boost priority for players who have been waiting a long time
+                if (player.lastGameTime && player.status !== 'playing' && player.status !== 'resting') {
+                    const hoursWaiting = (Date.now() - player.lastGameTime) / 3600000;
+                    if (hoursWaiting > 1) {
+                        score += Math.min(hoursWaiting * 10, 30); // Bonus for waiting >1 hour, capped at 30
+                    }
+                }
+                
+                return { player, score };
+            });
+            
+            // Sort by score (highest first)
+            scoredPlayers.sort((a, b) => b.score - a.score);
+            
+            // Log the top 10 scored players for debugging
+            console.log('Top scored players:');
+            scoredPlayers.slice(0, 10).forEach((item, index) => {
+                console.log(`${index + 1}. ${item.player.name} (Score: ${item.score.toFixed(2)}, Games: ${item.player.gamesPlayed}, Status: ${item.player.status})`);
+            });
+            
+            // Select top 4 players
+            const selectedPlayers = scoredPlayers.slice(0, 4).map(item => item.player);
+            
+            // Add selected players to queue
+            this.addToQueue(availableCourt.id, selectedPlayers.map(p => p.id));
+            
+            console.log('Added to queue:', selectedPlayers.map(p => p.name).join(', '));
+            Toast.show('Magic queue created!', Toast.types.SUCCESS);
+            
+            availableCourt.processingMagicQueue = false;
+            console.groupEnd();
+            return true;
+            
+        } catch (error) {
+            console.error('Magic queue error:', error);
+            Toast.show('Magic queue failed', Toast.types.ERROR);
+            console.groupEnd();
+            return false;
         }
     }
 }
@@ -900,6 +1280,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Apply initial gradients
     applyCourtGradients();
+    
+    // Add this near the top of your initialization code
+    function initializeSidebarToggle() {
+        const container = document.querySelector('.container');
+        const sidebar = document.querySelector('.sidebar');
+        
+        // Create toggle button
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'sidebar-toggle-btn';
+        toggleBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+        toggleBtn.setAttribute('aria-label', 'Toggle sidebar');
+        
+        // Insert toggle button
+        container.insertBefore(toggleBtn, sidebar);
+        
+        // Add click handler
+        toggleBtn.addEventListener('click', () => {
+            container.classList.toggle('sidebar-collapsed');
+            // Update button icon
+            toggleBtn.innerHTML = container.classList.contains('sidebar-collapsed') 
+                ? '<i class="fas fa-chevron-right"></i>' 
+                : '<i class="fas fa-chevron-left"></i>';
+            
+            // Save preference
+            localStorage.setItem('sidebarCollapsed', container.classList.contains('sidebar-collapsed'));
+        });
+        
+        // Restore previous state
+        if (localStorage.getItem('sidebarCollapsed') === 'true') {
+            container.classList.add('sidebar-collapsed');
+            toggleBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+        }
+    }
+
+    // Call this function after DOM is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeSidebarToggle();
+    });
     
     console.groupEnd();
 });
@@ -1916,14 +2334,12 @@ class PlayerListView {
                     <div class="player-stats">
                         <span class="games-played" title="Games Played">
                             <i class="fas fa-trophy"></i>
-                            ${player.gamesPlayed}
+                            ${this.formatGamesPlayed(player.gamesPlayed)}
                         </span>
-                        ${player.lastGameTime ? `
-                            <span class="last-game" title="Last Game">
-                                <i class="fas fa-clock"></i>
-                                ${this.formatLastGameTime(player.lastGameTime)}
-                            </span>
-                        ` : ''}
+                        <span class="last-game" title="Last Game">
+                            <i class="fas fa-clock"></i>
+                            ${this.formatLastGameTime(player.lastGameTime)}
+                        </span>
                     </div>
                 </div>
                 <div class="player-statuses">
@@ -1936,6 +2352,12 @@ class PlayerListView {
                 </div>
             </div>
         `;
+    }
+
+    formatGamesPlayed(gamesCount) {
+        if (gamesCount === 0) return 'No games';
+        if (gamesCount === 1) return '1 game';
+        return `${gamesCount} games`;
     }
 
     getPlayerStatuses(player) {
@@ -1989,15 +2411,36 @@ class PlayerListView {
     }
 
     formatLastGameTime(timestamp) {
-        const minutes = Math.floor((Date.now() - timestamp) / 60000);
-        if (minutes < 60) {
-            return `${minutes}m ago`;
+        if (!timestamp) return 'Never';
+        
+        const now = Date.now();
+        const elapsed = now - timestamp;
+        
+        // Show seconds if less than 1 minute
+        const seconds = Math.floor(elapsed / 1000);
+        if (seconds < 60) {
+            return `${seconds}s ago`;
         }
+        
+        // Show minutes if less than 1 hour
+        const minutes = Math.floor(elapsed / 60000);
+        if (minutes < 60) {
+            // Include seconds for more precision
+            const remainingSeconds = Math.floor((elapsed % 60000) / 1000);
+            return `${minutes}m ${remainingSeconds}s ago`;
+        }
+        
+        // Show hours if less than 24 hours
         const hours = Math.floor(minutes / 60);
         if (hours < 24) {
-            return `${hours}h ago`;
+            const remainingMinutes = minutes % 60;
+            return `${hours}h ${remainingMinutes}m ago`;
         }
-        return `${Math.floor(hours / 24)}d ago`;
+        
+        // Show days for older times
+        const days = Math.floor(hours / 24);
+        const remainingHours = hours % 24;
+        return `${days}d ${remainingHours}h ago`;
     }
 
     setGameManager(gameManager) {
@@ -2014,15 +2457,36 @@ class PlayerListView {
 
 // Helper function to format the last game time
 function formatLastGameTime(timestamp) {
-    const minutes = Math.floor((Date.now() - timestamp) / 60000);
-    if (minutes < 60) {
-        return `${minutes}m ago`;
+    if (!timestamp) return 'Never';
+    
+    const now = Date.now();
+    const elapsed = now - timestamp;
+    
+    // Show seconds if less than 1 minute
+    const seconds = Math.floor(elapsed / 1000);
+    if (seconds < 60) {
+        return `${seconds}s ago`;
     }
+    
+    // Show minutes if less than 1 hour
+    const minutes = Math.floor(elapsed / 60000);
+    if (minutes < 60) {
+        // Include seconds for more precision
+        const remainingSeconds = Math.floor((elapsed % 60000) / 1000);
+        return `${minutes}m ${remainingSeconds}s ago`;
+    }
+    
+    // Show hours if less than 24 hours
     const hours = Math.floor(minutes / 60);
     if (hours < 24) {
-        return `${hours}h ago`;
+        const remainingMinutes = minutes % 60;
+        return `${hours}h ${remainingMinutes}m ago`;
     }
-    return `${Math.floor(hours / 24)}d ago`;
+    
+    // Show days for older times
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    return `${days}d ${remainingHours}h ago`;
 }
 
 // Helper function to format player status
@@ -2432,3 +2896,238 @@ function removeQueueItem(index) {
 }
 
 // ... existing code ...
+
+// Add a new class to manage player timers
+class PlayerTimerManager {
+    constructor(gameManager, eventBus) {
+        this.gameManager = gameManager;
+        this.eventBus = eventBus;
+        this.timerId = null;
+        this.updateInterval = 1000; // Update every second
+        this.initialize();
+    }
+
+    initialize() {
+        console.group('🕒 Initializing PlayerTimerManager');
+        
+        // Start the timer that updates all player time displays
+        this.startTimer();
+        
+        // Listen for relevant events that should trigger immediate updates
+        this.eventBus.on('game:completed', () => this.updateAllTimers(true));
+        this.eventBus.on('game:started', () => this.updateAllTimers(true));
+        this.eventBus.on('players:updated', () => this.updateAllTimers(true));
+        
+        // Do an initial update
+        this.updateAllTimers(true);
+        
+        console.groupEnd();
+    }
+
+    startTimer() {
+        // Clear any existing timer
+        if (this.timerId) {
+            clearInterval(this.timerId);
+        }
+        
+        // Update on the specified interval
+        this.timerId = setInterval(() => {
+            this.updateAllTimers();
+        }, this.updateInterval);
+        
+        console.log('Started player timer with ID:', this.timerId);
+    }
+
+    updateAllTimers(forceUpdate = false) {
+        if (!this.gameManager || !this.gameManager.players) {
+            console.warn('GameManager or players not available');
+            return;
+        }
+        
+        // Get all player elements in both desktop and mobile views
+        const playerElements = document.querySelectorAll('.player-item');
+        
+        playerElements.forEach(element => {
+            const playerId = element.dataset.playerId;
+            if (!playerId) return;
+            
+            const player = this.gameManager.players.get(playerId);
+            if (!player) return;
+            
+            // Update the last game time display
+            const timeDisplay = element.querySelector('.last-game');
+            if (timeDisplay) {
+                timeDisplay.innerHTML = `
+                    <i class="fas fa-clock"></i>
+                    ${formatLastGameTime(player.lastGameTime)}
+                `;
+            }
+            
+            // Update games played display
+            const gamesDisplay = element.querySelector('.games-played');
+            if (gamesDisplay) {
+                gamesDisplay.innerHTML = `
+                    <i class="fas fa-trophy"></i>
+                    ${this.formatGamesPlayed(player.gamesPlayed)}
+                `;
+            }
+            
+            // Update player status badges
+            this.updatePlayerStatus(element, player, forceUpdate);
+        });
+    }
+    
+    updatePlayerStatus(element, player, forceUpdate = false) {
+        // Only update status if forced or if player is in a dynamic state (resting)
+        if (!forceUpdate && player.status !== 'resting') return;
+        
+        const statusesContainer = element.querySelector('.player-statuses');
+        if (!statusesContainer) return;
+        
+        // Get updated statuses
+        const statuses = this.getPlayerStatuses(player);
+        
+        // Update the status badges
+        statusesContainer.innerHTML = statuses.map(status => `
+            <span class="status-badge ${status.class}">
+                <i class="fas ${status.icon}"></i>
+                ${status.label}
+            </span>
+        `).join('');
+    }
+    
+    getPlayerStatuses(player) {
+        const statuses = [];
+        const now = Date.now();
+        
+        // Check if currently playing
+        if (player.status === 'playing') {
+            statuses.push({
+                label: 'Playing',
+                icon: 'fa-table-tennis-paddle-ball',
+                class: 'playing'
+            });
+            return statuses; // If playing, no need for other statuses
+        }
+
+        // Check if in any queue
+        const isQueued = Array.from(this.gameManager.courts.values())
+            .some(court => court.queue.some(p => p.id === player.id));
+        if (isQueued) {
+            // Add queue position information if possible
+            let queuePosition = this.getPlayerQueuePosition(player);
+            let queueLabel = 'Queued';
+            
+            if (queuePosition) {
+                queueLabel = `Queued (#${queuePosition})`;
+            }
+            
+            statuses.push({
+                label: queueLabel,
+                icon: 'fa-clock',
+                class: 'queued'
+            });
+            return statuses; // If queued, no need for other statuses
+        }
+
+        // Check if resting (played recently)
+        const restingThreshold = 10 * 60 * 1000; // 10 minutes in milliseconds
+        if (player.lastGameTime) {
+            const timeSinceLastGame = now - player.lastGameTime;
+            
+            if (timeSinceLastGame < restingThreshold) {
+                statuses.push({
+                    label: 'Resting',
+                    icon: 'fa-couch',
+                    class: 'resting'
+                });
+                return statuses;
+            }
+        }
+
+        // Check waiting time for available players
+        if (player.gamesPlayed > 0 && player.lastGameTime) {
+            const waitingTime = now - player.lastGameTime;
+            const waitingMinutes = Math.floor(waitingTime / 60000);
+            
+            // Add urgency indicators for players waiting a long time
+            if (waitingMinutes >= 30) {
+                statuses.push({
+                    label: `Waiting ${waitingMinutes}m`,
+                    icon: 'fa-exclamation-circle',
+                    class: 'waiting urgent'
+                });
+                return statuses;
+            } else if (waitingMinutes >= 15) {
+                statuses.push({
+                    label: `Waiting ${waitingMinutes}m`,
+                    icon: 'fa-exclamation',
+                    class: 'waiting high'
+                });
+                return statuses;
+            }
+            
+            // Regular available status for players who have played before
+            statuses.push({
+                label: 'Available',
+                icon: 'fa-check',
+                class: 'available'
+            });
+            return statuses;
+        }
+
+        // Default status for players who haven't played yet
+        statuses.push({
+            label: 'No Games Yet',
+            icon: 'fa-circle-minus',
+            class: 'nogames'
+        });
+        
+        return statuses;
+    }
+    
+    // Helper method to find a player's position in queue
+    getPlayerQueuePosition(player) {
+        for (const court of this.gameManager.courts.values()) {
+            const queueIndex = court.queue.findIndex(p => p.id === player.id);
+            if (queueIndex !== -1) {
+                // Calculate position (1-based)
+                return Math.floor(queueIndex / 4) + 1;
+            }
+        }
+        return null;
+    }
+    
+    stopTimer() {
+        if (this.timerId) {
+            clearInterval(this.timerId);
+            this.timerId = null;
+            console.log('Stopped player timer');
+        }
+    }
+
+    formatGamesPlayed(gamesCount) {
+        if (gamesCount === 0) return 'No games';
+        if (gamesCount === 1) return '1 game';
+        return `${gamesCount} games`;
+    }
+}
+
+// Add CSS classes for the new status indicators
+document.addEventListener('DOMContentLoaded', function() {
+    // Add dynamic styles for the new status classes
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        .status-badge.waiting.urgent {
+            background-color: rgba(255, 59, 48, 0.15);
+            color: var(--status-waiting);
+            font-weight: bold;
+        }
+        
+        .status-badge.waiting.high {
+            background-color: rgba(255, 149, 0, 0.15);
+            color: var(--status-queued);
+        }
+    `;
+    document.head.appendChild(styleElement);
+});

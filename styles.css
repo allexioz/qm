@@ -267,7 +267,7 @@ body {
 }
 
 .court-2d {
-    aspect-ratio: 1 / 1.5;
+    aspect-ratio: 1 / 2;
     width: 100%;
     position: relative;
     display: flex;
@@ -341,7 +341,7 @@ body {
     /* Update court touch handling */
     .court-2d {
         /* Remove aspect ratio */
-        aspect-ratio: unset;
+        aspect-ratio: 1/2;
         height: auto;
         /* Keep other existing styles */
         touch-action: none;
@@ -390,7 +390,6 @@ body {
     display: flex;
     align-items: center;
     gap: 4px;
-    
     background: rgba(255, 255, 255, 1);
     padding: 4px 8px;
     border-radius: 12px;
@@ -2488,4 +2487,61 @@ body {
     .tab-btn.active {
         color: var(--primary-color);
     }
+}
+
+/* Add these styles for the sidebar toggle */
+.sidebar-toggle-btn {
+    position: absolute;
+    left: var(--sidebar-width);
+    top: 50%;
+    transform: translateY(-50%);
+    background: white;
+    border: 1px solid #E5E5EA;
+    border-left: none;
+    height: 40px;
+    width: 20px;
+    border-radius: 0 8px 8px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #8E8E93;
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+
+.sidebar-toggle-btn:hover {
+    background: #f5f5f7;
+    color: var(--primary-color);
+}
+
+/* Add transition to sidebar */
+.sidebar {
+    transition: transform 0.3s ease, width 0.3s ease;
+}
+
+/* Collapsed state styles */
+.container.sidebar-collapsed .sidebar {
+    transform: translateX(calc(-1 * var(--sidebar-width)));
+    width: 0;
+}
+
+.container.sidebar-collapsed .sidebar-toggle-btn {
+    left: 0;
+}
+
+/* Hide toggle button on mobile */
+@media (max-width: 768px) {
+    .sidebar-toggle-btn {
+        display: none;
+    }
+}
+
+/* Ensure main content adjusts when sidebar is collapsed */
+.main-content {
+    transition: margin-left 0.3s ease;
+}
+
+.container.sidebar-collapsed .main-content {
+    margin-left: 0;
 }
