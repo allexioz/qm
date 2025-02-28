@@ -28,9 +28,10 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', async () => {
                 try {
-                    await navigator.serviceWorker.register('/sw.js');
+                    const registration = await navigator.serviceWorker.register('sw.js');
+                    console.log('ServiceWorker registration successful');
                 } catch (error) {
-                    console.error('Service worker registration failed:', error);
+                    console.error('ServiceWorker registration failed:', error);
                 }
             });
         }
@@ -53,7 +54,7 @@
             <div class="container">
                 <aside class="sidebar">
                     <div class="sidebar-header">
-                        <h2>Players List 🏸</h2>
+                        <h2>Queue Master 🏸</h2>
                     </div>
                     <div class="import-section">
                         <textarea id="playerImport" placeholder="Enter player names (one per line)"></textarea>
@@ -78,7 +79,7 @@
         <div class="view" id="players-view">
             <div class="mobile-players-content">
                 <div class="sidebar-header">
-                    <h2>Players List 🏸</h2>
+                    <h2>Queue Master 🏸</h2>
                 </div>
                 <div class="import-section">
                     <textarea id="mobilePlayerImport" placeholder="Enter player names (one per line)"></textarea>

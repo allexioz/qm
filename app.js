@@ -7,6 +7,30 @@ class Player {
         this.courtId = null;
         this.gamesPlayed = 0;
         this.lastGameTime = null;
+        this.skillLevel = 1; // Default to level 1 (range 1-5)
+    }
+
+    toJSON() {
+        return {
+            id: this.id,
+            name: this.name,
+            status: this.status,
+            courtId: this.courtId,
+            gamesPlayed: this.gamesPlayed,
+            lastGameTime: this.lastGameTime,
+            skillLevel: this.skillLevel
+        };
+    }
+
+    static fromJSON(data) {
+        const player = new Player(data.name);
+        player.id = data.id;
+        player.status = data.status;
+        player.courtId = data.courtId;
+        player.gamesPlayed = data.gamesPlayed;
+        player.lastGameTime = data.lastGameTime;
+        player.skillLevel = data.skillLevel || 1; // Default to 1 if not set
+        return player;
     }
 }
 
@@ -335,6 +359,78 @@ class LocalStorage {
             return null;
         }
     }
+
+    saveState(gameManager) {
+        try {
+            const state = {
+                players: Array.from(gameManager.players.entries()).map(([id, player]) => ({
+                    ...player,
+                    skillLevel: player.skillLevel || 1 // Ensure skill level is saved
+                })),
+                courts: Array.from(gameManager.courts.entries()).map(([id, court]) => ({
+                    id: court.id,
+                    status: court.status,
+                    players: court.players,
+                    startTime: court.startTime,
+                    queue: court.queue
+                }))
+            };
+            
+            localStorage.setItem(this.storageKey, JSON.stringify(state));
+            console.log('✅ State saved successfully');
+        } catch (error) {
+            console.error('Failed to save state:', error);
+            Toast.show('Failed to save game state', Toast.types.ERROR);
+        }
+    }
+
+    loadState() {
+        try {
+            const savedState = localStorage.getItem(this.storageKey);
+            if (!savedState) {
+                console.log('No saved state found');
+                return null;
+            }
+
+            const state = JSON.parse(savedState);
+            
+            // Convert players array back to Map with skill levels
+            const players = new Map(state.players.map(player => [
+                player.id,
+                {
+                    ...player,
+                    skillLevel: player.skillLevel || 1 // Default to 1 if not set
+                }
+            ]));
+
+            // Convert courts array back to Map
+            const courts = new Map(state.courts.map(courtData => {
+                const court = new Court(courtData.id);
+                court.status = courtData.status;
+                court.players = courtData.players;
+                court.startTime = courtData.startTime;
+                court.queue = courtData.queue;
+                return [court.id, court];
+            }));
+
+            console.log('✅ State loaded successfully');
+            return { players, courts };
+        } catch (error) {
+            console.error('Failed to load state:', error);
+            Toast.show('Failed to load saved game state', Toast.types.ERROR);
+            return null;
+        }
+    }
+
+    clear() {
+        try {
+            localStorage.removeItem(this.storageKey);
+            console.log('✅ Storage cleared successfully');
+        } catch (error) {
+            console.error('Failed to clear storage:', error);
+            Toast.show('Failed to clear saved game state', Toast.types.ERROR);
+        }
+    }
 }
 
 // Game Manager
@@ -525,9 +621,7 @@ class GameManager {
         const playerNames = namesText
             .split('\n')
             .map(name => name.trim())
-            // Remove numbers and dots from the start (e.g., "1.", "12.", etc.)
-            .map(name => name.replace(/^\d+\.\s*/, ''))
-            // Capitalize first letter of each word
+            .map(name => name.replace(/^\d+\.\s*/, '')) // Remove numbers and dots from start
             .map(name => name
                 .split(' ')
                 .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -539,7 +633,6 @@ class GameManager {
 
         if (playerNames.length === 0) {
             console.warn('❌ No valid player names found');
-            Toast.show('Please enter at least one player name', Toast.types.ERROR);
             throw new Error('Please enter at least one player name');
         }
 
@@ -556,49 +649,51 @@ class GameManager {
             console.log('Added player:', player);
         });
 
+        // Save state and emit events
+        this.saveState();
+        this.eventBus.emit('players:updated');
+
         if (newPlayers.length > 0) {
             console.log(`✅ Added ${newPlayers.length} new players`);
-            Toast.show(`Added ${newPlayers.length} new player${newPlayers.length === 1 ? '' : 's'}`, Toast.types.SUCCESS);
+            return newPlayers.length;
         } else {
-            console.log('ℹ️ All players already exist');
-            Toast.show('All players already exist', Toast.types.INFO);
+            console.log('❌ No new players to add');
+            throw new Error('All players already exist');
         }
 
-        this.saveState();
-        this.eventBus.emit('players:updated');
-        return newPlayers.length;
+        console.groupEnd();
     }
 
-    resetAllData() {
-        console.group('🔄 Resetting all data');
+    reset() {
+        console.group('🔄 Resetting game state');
         
-        // Clear players
-        this.players.clear();
-        
-        // Reset courts
-        this.courts.forEach(court => {
-            // Stop any running timers
-            if (court.timerId) {
-                clearInterval(court.timerId);
-                court.timerId = null;
-            }
+        try {
+            // Clear all players
+            this.players = new Map();
             
-            court.players = [];
-            court.status = 'empty';
-            court.startTime = null;
-            court.queue = [];
-        });
-
-        // Save empty state
-        this.saveState();
+            // Reset all courts
+            this.courts = new Map();
+            ['court-1', 'court-2', 'court-3', 'court-4', 'court-5'].forEach(id => {
+                this.courts.set(id, new Court(id));
+            });
+            
+            // Clear storage
+            this.storage.clear();
+            
+            // Save empty state
+            this.saveState();
+            
+            // Notify UI
+            this.eventBus.emit('players:updated');
+            this.eventBus.emit('courts:updated');
+            
+            Toast.show('All data has been reset', Toast.types.SUCCESS);
+            console.log('✅ Reset completed successfully');
+        } catch (error) {
+            console.error('Reset failed:', error);
+            Toast.show('Reset failed', Toast.types.ERROR);
+        }
         
-        // Emit events in correct order
-        this.courts.forEach(court => {
-            this.eventBus.emit('court:updated', court);
-        });
-        this.eventBus.emit('players:updated');
-        
-        console.log('✅ All data reset successfully');
         console.groupEnd();
     }
 
@@ -1119,46 +1214,13 @@ class GameManager {
                 return false;
             }
             
-            // Score and sort players
-            const scoredPlayers = eligiblePlayers.map(player => {
-                let score = 0;
-                
-                // Base score is inverse of games played (fewer games = higher priority)
-                score += 100 - Math.min(player.gamesPlayed * 10, 90);
-                
-                // Time since last game (longer wait = higher priority)
-                if (player.lastGameTime) {
-                    const minutesSinceLastGame = (Date.now() - player.lastGameTime) / 60000;
-                    score += Math.min(minutesSinceLastGame, 60); // Cap at 60 minutes
-                } else {
-                    // Never played gets high priority
-                    score += 70;
-                }
-                
-                // NEW: Reduce priority for currently playing players
-                if (player.status === 'playing') {
-                    score -= 50; // Significant reduction but not impossible to be selected
-                }
-                
-                // NEW: Reduce priority for resting players
-                if (player.status === 'resting') {
-                    const minutesSinceLastGame = (Date.now() - player.lastGameTime) / 60000;
-                    const restingPenalty = Math.max(0, 10 - minutesSinceLastGame);
-                    score -= restingPenalty * 5; // Gradually reduce penalty as rest time increases
-                }
-                
-                // NEW: Boost priority for players who have been waiting a long time
-                if (player.lastGameTime && player.status !== 'playing' && player.status !== 'resting') {
-                    const hoursWaiting = (Date.now() - player.lastGameTime) / 3600000;
-                    if (hoursWaiting > 1) {
-                        score += Math.min(hoursWaiting * 10, 30); // Bonus for waiting >1 hour, capped at 30
-                    }
-                }
-                
-                return { player, score };
-            });
-            
-            // Sort by score (highest first)
+            // Score and sort players using the new calculation method
+            const scoredPlayers = eligiblePlayers.map(player => ({
+                player,
+                score: this.calculatePlayerScore(player, eligiblePlayers)
+            }));
+
+            // Sort by score descending
             scoredPlayers.sort((a, b) => b.score - a.score);
             
             // Log the top 10 scored players for debugging
@@ -1186,6 +1248,108 @@ class GameManager {
             console.groupEnd();
             return false;
         }
+    }
+
+    // Add to GameManager class
+    adjustPlayerLevel(playerId, newLevel) {
+        console.group('🎮 Adjusting Player Level');
+        const player = this.players.get(playerId);
+        
+        if (!player) {
+            console.error('Player not found');
+            console.groupEnd();
+            return;
+        }
+
+        // Update to allow levels 1-10
+        const level = Math.max(1, Math.min(10, newLevel));
+        
+        // Update player level
+        player.skillLevel = level;
+        
+        // If player is in a game, update the court view
+        if (player.courtId) {
+            const court = this.courts.get(player.courtId);
+            if (court) {
+                this.eventBus.emit('court:updated', court);
+            }
+        }
+        
+        // Save state and emit events
+        this.saveState();
+        this.eventBus.emit('player:updated', player);
+        this.eventBus.emit('players:updated');
+        
+        Toast.show(`${player.name}'s level updated to ${this.getSkillLevelName(level)} (${level})`, Toast.types.SUCCESS);
+        console.groupEnd();
+    }
+
+    getSkillLevelName(level) {
+        const levels = {
+            1: 'Novice',
+            2: 'Rookie',
+            3: 'Beginner',
+            4: 'Amateur',
+            5: 'Intermediate',
+            6: 'Advanced',
+            7: 'Expert',
+            8: 'Elite',
+            9: 'Master',
+            10: 'Champion'
+        };
+        return levels[level] || 'Unknown';
+    }
+
+    // Update the magic queue algorithm to consider skill levels alongside existing factors
+    calculatePlayerScore(player, eligiblePlayers) {
+        let score = 0;
+        const now = Date.now();
+
+        // Base score is inverse of games played (fewer games = higher priority)
+        score += 100 - Math.min(player.gamesPlayed * 10, 90);
+        
+        // Time since last game (longer wait = higher priority)
+        if (player.lastGameTime) {
+            const minutesSinceLastGame = (now - player.lastGameTime) / 60000;
+            score += Math.min(minutesSinceLastGame, 60); // Cap at 60 minutes
+        } else {
+            // Never played gets high priority
+            score += 70;
+        }
+        
+        // Existing status-based adjustments
+        if (player.status === 'playing') {
+            score -= 50; // Significant reduction but not impossible
+        }
+        
+        if (player.status === 'resting') {
+            const minutesSinceLastGame = (now - player.lastGameTime) / 60000;
+            const restingPenalty = Math.max(0, 10 - minutesSinceLastGame);
+            score -= restingPenalty * 5;
+        }
+        
+        // Long wait time bonus
+        if (player.lastGameTime && player.status !== 'playing' && player.status !== 'resting') {
+            const hoursWaiting = (now - player.lastGameTime) / 3600000;
+            if (hoursWaiting > 1) {
+                score += Math.min(hoursWaiting * 10, 30);
+            }
+        }
+
+        // NEW: Skill level considerations
+        const avgSkillLevel = eligiblePlayers.reduce((sum, p) => sum + p.skillLevel, 0) / eligiblePlayers.length;
+        const skillDiff = Math.abs(player.skillLevel - avgSkillLevel);
+        
+        // Adjust penalties for 10-level scale (more granular)
+        score -= skillDiff * 8; // Reduced from 15 to account for larger scale
+        
+        // Consider players within 2 levels as similar (instead of 1)
+        const similarSkillPlayers = eligiblePlayers.filter(p => 
+            Math.abs(p.skillLevel - player.skillLevel) <= 2
+        ).length;
+        score += similarSkillPlayers * 5;
+
+        return score;
     }
 }
 
@@ -1320,6 +1484,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     console.groupEnd();
+
+    // Add reset functionality
+    const resetButton = document.querySelector('#resetButton');
+    if (resetButton) {
+        resetButton.addEventListener('click', () => {
+            if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+                gameManager.reset();
+            }
+        });
+    }
+
+    // Initialize pull-to-refresh
+    const pullToRefresh = new PullToRefresh();
 });
 
 function initializeTabs() {
@@ -1832,6 +2009,11 @@ class CourtView {
         return players.map(player => `
             <div class="player">
                 <span>${player.name}</span>
+                <span class="skill-badge level-${player.skillLevel}" 
+                      title="Level ${player.skillLevel}"
+                      style="margin-left: 8px">
+                    Lvl ${player.skillLevel} • ${this.gameManager.getSkillLevelName(player.skillLevel)}
+                </span>
             </div>
         `).join('');
     }
@@ -1971,6 +2153,25 @@ class CourtView {
             console.log('Reset time displays');
         }
         console.groupEnd();
+    }
+
+    renderPlayer(player) {
+        if (!player) return '';
+        
+        return `
+            <div class="court-player" data-player-id="${player.id}">
+                <div class="player-info">
+                    <span class="player-name">${player.name}</span>
+                    <span class="skill-badge level-${player.skillLevel}" 
+                          title="${this.gameManager.getSkillLevelName(player.skillLevel)}">
+                        Lvl ${player.skillLevel}
+                    </span>
+                </div>
+                <button class="remove-player" title="Remove player">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
     }
 }
 
@@ -2214,13 +2415,61 @@ class PlayerListView {
         this.gameManager = gameManager;
         this.eventBus = eventBus;
         
-        // Only initialize if we have a gameManager
-        if (gameManager) {
-            this.initialize();
-        }
-        
-        // Register event listeners regardless of gameManager
-        this.registerEventListeners();
+        // Register for events
+        this.eventBus.on('players:updated', () => {
+            this.updatePlayersList();
+        });
+
+        // Initialize UI and attach event listeners
+        this.updatePlayersList();
+        this.attachEventListeners();
+        this.attachImportListeners(); // Add this new method call
+    }
+
+    // Add this new method
+    attachImportListeners() {
+        // Handle both desktop and mobile import buttons
+        ['importButton', 'mobileImportButton'].forEach(btnId => {
+            const button = document.getElementById(btnId);
+            const textarea = document.getElementById(btnId === 'importButton' ? 'playerImport' : 'mobilePlayerImport');
+            
+            if (button && textarea) {
+                button.addEventListener('click', () => {
+                    console.group('📝 Import Button Clicked');
+                    const namesText = textarea.value.trim();
+            
+                    if (!namesText) {
+                        Toast.show('Please enter player names', Toast.types.ERROR);
+                        console.groupEnd();
+                        return;
+                    }
+
+                    try {
+                        this.gameManager.importPlayers(namesText);
+                        textarea.value = ''; // Clear the textarea after successful import
+                        Toast.show('Players imported successfully', Toast.types.SUCCESS);
+                    } catch (error) {
+                        Toast.show(error.message, Toast.types.ERROR);
+                    }
+                    
+                    console.groupEnd();
+                });
+            }
+        });
+    }
+
+    // Update the existing updatePlayersList method
+    updatePlayersList() {
+        const playersList = document.querySelector('.players-list');
+        if (!playersList) return;
+
+        // Sort players by name
+        const sortedPlayers = Array.from(this.gameManager.players.values())
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        playersList.innerHTML = sortedPlayers.length > 0
+            ? sortedPlayers.map(player => this.renderPlayerItem(player)).join('')
+            : this.renderEmptyState(); // Use renderEmptyState instead of a simple div
     }
 
     registerEventListeners() {
@@ -2273,8 +2522,7 @@ class PlayerListView {
                     if (!this.gameManager) return;
                     
                     if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
-                        this.gameManager.resetAllData();
-                        Toast.show('All data has been reset', Toast.types.INFO);
+                        this.gameManager.reset();
                     }
                 });
             }
@@ -2285,41 +2533,21 @@ class PlayerListView {
         console.groupEnd();
     }
 
-    updatePlayersList() {
-        if (!this.gameManager) return;
-        
-        console.group('🔄 Updating Players List');
-        
-        // Update both desktop and mobile lists
-        const listsToUpdate = [
-            document.getElementById('playersList'),
-            document.querySelector('.mobile-players-list')
-        ];
-
-        listsToUpdate.forEach(list => {
-            if (!list) return;
-
-            const players = Array.from(this.gameManager.players.values());
-
-            if (players.length === 0) {
-                list.innerHTML = this.renderEmptyState();
-            } else {
-                const sortedPlayers = players.sort((a, b) => a.name.localeCompare(b.name));
-                list.innerHTML = sortedPlayers
-                    .map(player => this.renderPlayerItem(player))
-                    .join('');
-            }
-        });
-        
-        console.groupEnd();
-    }
-
     renderEmptyState() {
         return `
             <div class="empty-state">
-                <i class="fas fa-users-slash"></i>
-                <p>No Players Added</p>
-                <span>Import players using the form above</span>
+                <div class="empty-state-icon">
+                    <i class="fas fa-users"></i>
+                    <i class="fas fa-plus empty-state-plus"></i>
+                </div>
+                <h3 class="empty-state-title">No Players Yet</h3>
+                <p class="empty-state-text">
+                    Start by adding players:
+                    <ul class="empty-state-list">
+                        <li><i class="fas fa-keyboard"></i> Type names in the box above</li>
+                        <li><i class="fas fa-file-import"></i> Import from clipboard</li>
+                    </ul>
+                </p>
             </div>
         `;
     }
@@ -2330,25 +2558,41 @@ class PlayerListView {
         return `
             <div class="player-item" data-player-id="${player.id}">
                 <div class="player-info">
-                    <span class="player-name">${player.name}</span>
+                    <div class="player-header">
+                        <span class="player-name">${player.name}</span>
+                        <div class="level-control">
+                            <span class="skill-badge level-${player.skillLevel}" 
+                                  title="${this.gameManager.getSkillLevelName(player.skillLevel)}">
+                                Lvl ${player.skillLevel} • ${this.gameManager.getSkillLevelName(player.skillLevel)}
+                            </span>
+                            <div class="level-buttons">
+                                <button class="level-btn" data-action="decrease-level" 
+                                        ${player.skillLevel <= 1 ? 'disabled' : ''}>
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <button class="level-btn" data-action="increase-level" 
+                                        ${player.skillLevel >= 10 ? 'disabled' : ''}>
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="player-stats">
                         <span class="games-played" title="Games Played">
                             <i class="fas fa-trophy"></i>
                             ${this.formatGamesPlayed(player.gamesPlayed)}
                         </span>
+                        ${statuses.map(status => `
+                            <span class="status-badge ${status.class}">
+                                <i class="fas ${status.icon}"></i>
+                                ${status.label}
+                            </span>
+                        `).join('')}
                         <span class="last-game" title="Last Game">
                             <i class="fas fa-clock"></i>
                             ${this.formatLastGameTime(player.lastGameTime)}
                         </span>
                     </div>
-                </div>
-                <div class="player-statuses">
-                    ${statuses.map(status => `
-                        <span class="status-badge ${status.class}">
-                            <i class="fas ${status.icon}"></i>
-                            ${status.label}
-                        </span>
-                    `).join('')}
                 </div>
             </div>
         `;
@@ -2452,6 +2696,31 @@ class PlayerListView {
     updateUI() {
         // Update the players list when UI needs refresh
         this.updatePlayersList();
+    }
+
+    attachEventListeners() {
+        const playersList = document.querySelector('.players-list');
+        
+        playersList.addEventListener('click', (e) => {
+            const levelBtn = e.target.closest('.level-btn');
+            if (!levelBtn) return;
+
+            const playerItem = levelBtn.closest('.player-item');
+            if (!playerItem) return;
+
+            const playerId = playerItem.dataset.playerId;
+            const player = this.gameManager.players.get(playerId);
+            if (!player) return;
+
+            const action = levelBtn.dataset.action;
+            
+            // Update level checks to 10
+            if (action === 'increase-level' && player.skillLevel < 10) {
+                this.gameManager.adjustPlayerLevel(playerId, player.skillLevel + 1);
+            } else if (action === 'decrease-level' && player.skillLevel > 1) {
+                this.gameManager.adjustPlayerLevel(playerId, player.skillLevel - 1);
+            }
+        });
     }
 }
 
@@ -3130,4 +3399,123 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     `;
     document.head.appendChild(styleElement);
+});
+
+// Add this near the top of the file, after other class definitions
+class PullToRefresh {
+    constructor() {
+        this.startY = 0;
+        this.threshold = 150;
+        this.refreshing = false;
+        this.initialize();
+    }
+
+    initialize() {
+        // Create refresh indicator element
+        const indicator = document.createElement('div');
+        indicator.className = 'pull-refresh-indicator';
+        indicator.innerHTML = `
+            <div class="pull-refresh-spinner">
+                <i class="fas fa-sync-alt"></i>
+            </div>
+            <span class="pull-refresh-text">Pull down to refresh</span>
+        `;
+        document.body.insertBefore(indicator, document.body.firstChild);
+        
+        this.indicator = indicator;
+        this.spinner = indicator.querySelector('.fa-sync-alt');
+        this.text = indicator.querySelector('.pull-refresh-text');
+        
+        this.attachEventListeners();
+    }
+
+    attachEventListeners() {
+        let pulling = false;
+        let distance = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            // Only enable pull-to-refresh at the top of the page
+            if (window.scrollY === 0) {
+                this.startY = e.touches[0].pageY;
+                pulling = true;
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!pulling || this.refreshing) return;
+
+            distance = e.touches[0].pageY - this.startY;
+            if (distance > 0) {
+                // Prevent default scrolling when pulling down
+                e.preventDefault();
+                
+                // Apply resistance to the pull
+                const resistance = 0.4;
+                const pullDistance = Math.min(distance * resistance, this.threshold);
+                
+                this.indicator.style.transform = `translateY(${pullDistance}px)`;
+                this.spinner.style.transform = `rotate(${pullDistance * 2}deg)`;
+                
+                // Update text based on pull distance
+                if (pullDistance >= this.threshold) {
+                    this.text.textContent = 'Release to refresh';
+                } else {
+                    this.text.textContent = 'Pull down to refresh';
+                }
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', async () => {
+            if (!pulling || !distance) return;
+            
+            pulling = false;
+            
+            if (distance > this.threshold && !this.refreshing) {
+                await this.performRefresh();
+            } else {
+                this.resetIndicator();
+            }
+            
+            distance = 0;
+        });
+    }
+
+    async performRefresh() {
+        this.refreshing = true;
+        this.text.textContent = 'Refreshing...';
+        this.spinner.style.animation = 'spin 1s linear infinite';
+        
+        try {
+            // Clear all browser caches
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                await Promise.all(
+                    cacheNames.map(cacheName => caches.delete(cacheName))
+                );
+            }
+            
+            // Force reload from server
+            window.location.reload(true);
+        } catch (error) {
+            console.error('Refresh failed:', error);
+            Toast.show('Refresh failed', Toast.types.ERROR);
+            this.resetIndicator();
+        }
+    }
+
+    resetIndicator() {
+        this.indicator.style.transform = 'translateY(-100%)';
+        this.spinner.style.transform = 'rotate(0deg)';
+        this.spinner.style.animation = 'none';
+        this.text.textContent = 'Pull down to refresh';
+        this.refreshing = false;
+    }
+}
+
+// Add this to your initialization code
+document.addEventListener('DOMContentLoaded', () => {
+    // ... existing initialization code ...
+    
+    // Initialize pull-to-refresh
+    const pullToRefresh = new PullToRefresh();
 });

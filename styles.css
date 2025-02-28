@@ -136,9 +136,10 @@ body {
     gap: var(--spacing-md);
     font-size: 0.85em;
     color: #666;
+    flex-wrap: wrap;
 }
 
-.games-played, .last-game {
+.games-played, .last-game, .status-badge {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -160,7 +161,7 @@ body {
 }
 
 .status-badge {
-    font-size: 0.75em;
+    font-size: 1em; /* Match other stats size */
     padding: 2px 6px;
     border-radius: 4px;
     display: flex;
@@ -2544,4 +2545,228 @@ body {
 
 .container.sidebar-collapsed .main-content {
     margin-left: 0;
+}
+
+/* Add to your existing CSS */
+.level-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 12px;
+    flex-wrap: nowrap; /* Prevent wrapping */
+}
+
+.player-header {
+    display: flex;
+    align-items: center;
+}
+
+.skill-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 500;
+    min-width: 48px;
+    justify-content: center;
+    white-space: nowrap; /* Prevent wrapping */
+}
+
+.skill-badge.level-1 { background: #E1E1E1; color: #666; }    /* Novice */
+.skill-badge.level-2 { background: #FFECB3; color: #FF6F00; } /* Rookie */
+.skill-badge.level-3 { background: #C8E6C9; color: #2E7D32; } /* Beginner */
+.skill-badge.level-4 { background: #B3E5FC; color: #0277BD; } /* Amateur */
+.skill-badge.level-5 { background: #BBDEFB; color: #1565C0; } /* Intermediate */
+.skill-badge.level-6 { background: #D1C4E9; color: #4527A0; } /* Advanced */
+.skill-badge.level-7 { background: #E1BEE7; color: #6A1B9A; } /* Expert */
+.skill-badge.level-8 { background: #FFCDD2; color: #C62828; } /* Elite */
+.skill-badge.level-9 { background: #FFE0B2; color: #E65100; } /* Master */
+.skill-badge.level-10 { background: #B2EBF2; color: #006064; border: 1px solid #00BCD4; } /* Champion */
+
+.level-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.level-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.05);
+    color: #666;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    transition: all 0.2s ease;
+}
+
+.level-btn:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.1);
+    color: #333;
+}
+
+.level-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Add hover tooltip for skill level names */
+.skill-badge:hover::after {
+    content: attr(title);
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+    transform: translateY(24px);
+}
+
+/* Empty state styling */
+.empty-state {
+    padding: var(--spacing-lg);
+    text-align: center;
+    color: #8E8E93;
+    background: rgba(142, 142, 147, 0.05);
+    border-radius: 12px;
+    margin: var(--spacing-md);
+}
+
+.empty-state-icon {
+    position: relative;
+    display: inline-block;
+    margin-bottom: var(--spacing-md);
+}
+
+.empty-state-icon .fa-users {
+    font-size: 2.5em;
+    color: #C7C7CC;
+}
+
+.empty-state-plus {
+    position: absolute;
+    bottom: -5px;
+    right: -10px;
+    font-size: 1em;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    padding: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.empty-state-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+    color: #3A3A3C;
+}
+
+.empty-state-text {
+    font-size: 0.9em;
+    line-height: 1.4;
+    margin-bottom: var(--spacing-md);
+}
+
+.empty-state-list {
+    list-style: none;
+    padding: 0;
+    margin: var(--spacing-md) 0 0;
+    text-align: left;
+}
+
+.empty-state-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    color: #636366;
+}
+
+.empty-state-list i {
+    color: var(--primary-color);
+    width: 16px;
+    text-align: center;
+}
+
+/* Add styles for court player skill badges */
+.court-player {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.court-player .player-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.court-player .skill-badge {
+    font-size: 0.75em;
+    padding: 2px 6px;
+    min-width: auto;
+}
+
+.court-player .player-name {
+    font-weight: 500;
+    color: #333;
+}
+
+/* Make the remove button more subtle */
+.court-player .remove-player {
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+}
+
+.court-player .remove-player:hover {
+    opacity: 1;
+}
+
+.pull-refresh-indicator {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background-color);
+    transform: translateY(-100%);
+    transition: transform 0.2s ease-out;
+    z-index: 1000;
+    gap: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pull-refresh-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: var(--primary-color);
+}
+
+.pull-refresh-text {
+    color: var(--text-color);
+    font-size: 14px;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
