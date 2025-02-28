@@ -95,11 +95,13 @@ body {
     opacity: 0.9;
 }
 
-.players-list {
+/* Common styles for both desktop and mobile player lists */
+.players-list,
+.mobile-players-list {
     flex: 1;
     overflow-y: auto;
-    padding-right: 4px; /* Space for scrollbar */
-    min-height: 0; /* Important for nested flex scrolling */
+    -webkit-overflow-scrolling: touch;
+    padding: var(--spacing-md);
 }
 
 .player-item {
@@ -2224,7 +2226,7 @@ body {
 
     /* Ensure import section stays within bounds */
     .import-section {
-        width: 100%;
+ 
         max-width: 100%;
         box-sizing: border-box;
     }
@@ -2636,7 +2638,7 @@ body {
     color: #8E8E93;
     background: rgba(142, 142, 147, 0.05);
     border-radius: 12px;
-    margin: var(--spacing-md);
+    
 }
 
 .empty-state-icon {
@@ -2769,4 +2771,128 @@ body {
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+/* Add these styles to ensure consistent mobile display */
+.mobile-players-list {
+    padding: var(--spacing-md);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+    min-height: 0; /* Important for nested flex scrolling */
+}
+
+/* Ensure player items look consistent on mobile */
+.mobile-players-list .player-item {
+    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: white;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Adjust spacing for mobile view */
+@media (max-width: 768px) {
+    .mobile-players-content {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow-y: auto; /* Make entire content scrollable */
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    }
+
+    /* Remove fixed positioning styles from import section */
+    .mobile-players-content .import-section {
+        flex-shrink: 0; /* Prevent shrinking */
+        margin: var(--spacing-md);
+        margin-bottom: var(--spacing-md);
+        background: white; /* Make it stand out from the list */
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Update mobile players list to not be independently scrollable */
+    .mobile-players-list {
+        flex: none; /* Remove flex growing */
+        padding: var(--spacing-md);
+        padding-top: 0; /* Remove top padding since import section has margin */
+    }
+
+    /* Ensure proper spacing between items */
+    .mobile-players-list .player-item:first-child {
+        margin-top: 0;
+    }
+
+    /* Optimize touch targets */
+    .mobile-players-list .player-item {
+        margin-bottom: var(--spacing-md);
+    }
+
+    /* Make buttons more touch-friendly */
+    .button-container {
+        gap: var(--spacing-sm);
+    }
+
+    .secondary-button,
+    .danger-button {
+        height: 44px; /* Slightly taller for better touch targets */
+    }
+}
+
+/* Update import section styles */
+.import-section {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-md);
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 12px;
+}
+
+/* Add button container */
+.button-container {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+/* Update button styles */
+.secondary-button,
+.danger-button {
+    flex: 1;
+    height: 40px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 8px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    transition: opacity 0.2s;
+    border: none;
+}
+
+.secondary-button {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.danger-button {
+    background-color: #FF3B30;
+    color: white;
+}
+
+.secondary-button:hover,
+.danger-button:hover {
+    opacity: 0.9;
+}
+
+/* Mobile specific adjustments */
+@media (max-width: 768px) {
+    .button-container {
+        gap: var(--spacing-sm); /* Slightly smaller gap on mobile */
+    }
 }

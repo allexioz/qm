@@ -669,12 +669,26 @@ class GameManager {
         
         try {
             // Clear all players
-            this.players = new Map();
+            this.players.clear();
             
             // Reset all courts
-            this.courts = new Map();
-            ['court-1', 'court-2', 'court-3', 'court-4', 'court-5'].forEach(id => {
-                this.courts.set(id, new Court(id));
+            this.courts.forEach(court => {
+                // Stop any running timers
+                if (court.timerId) {
+                    clearInterval(court.timerId);
+                    court.timerId = null;
+                }
+                
+                // Reset court state
+                court.players = [];
+                court.queue = [];
+                court.status = 'empty';
+                court.startTime = null;
+                court.startedFromQueue = false;
+                court.processingMagicQueue = false;
+                
+                // Emit court update event
+                this.eventBus.emit('court:updated', court);
             });
             
             // Clear storage
@@ -683,10 +697,20 @@ class GameManager {
             // Save empty state
             this.saveState();
             
-            // Notify UI
+            // Emit events to update UI
             this.eventBus.emit('players:updated');
-            this.eventBus.emit('courts:updated');
+            this.courts.forEach(court => {
+                this.eventBus.emit('court:updated', court);
+            });
             
+            // Force court views to re-render
+            this.courts.forEach(court => {
+                const courtElement = document.querySelector(`[data-court-id="${court.id}"]`);
+                if (courtElement) {
+                    courtElement.className = `court-2d empty`;
+                }
+            });
+
             Toast.show('All data has been reset', Toast.types.SUCCESS);
             console.log('✅ Reset completed successfully');
         } catch (error) {
@@ -1375,7 +1399,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const courtsContainer = document.querySelector('.courts-container');
     const courtViews = new Map();
     
-    // Create 5 courts instead of 2
+    // Create 5 courts
     ['court-1', 'court-2', 'court-3', 'court-4', 'court-5'].forEach(courtId => {
         try {
             const court = gameManager.courts.get(courtId);
@@ -1385,6 +1409,24 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`✅ Court ${courtId} mounted successfully`);
         } catch (error) {
             console.error(`Failed to mount court ${courtId}:`, error);
+        }
+    });
+
+    // Single initialization of reset button
+    const resetButtons = ['resetButton', 'mobileResetButton'];
+    resetButtons.forEach(btnId => {
+        const button = document.getElementById(btnId);
+        if (button) {
+            // Remove any existing listeners first
+            button.replaceWith(button.cloneNode(true));
+            const newButton = document.getElementById(btnId);
+            
+            // Add single listener
+            newButton.addEventListener('click', () => {
+                if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+                    gameManager.reset();
+                }
+            });
         }
     });
 
@@ -1484,16 +1526,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     console.groupEnd();
-
-    // Add reset functionality
-    const resetButton = document.querySelector('#resetButton');
-    if (resetButton) {
-        resetButton.addEventListener('click', () => {
-            if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
-                gameManager.reset();
-            }
-        });
-    }
 
     // Initialize pull-to-refresh
     const pullToRefresh = new PullToRefresh();
@@ -1806,8 +1838,10 @@ class CourtView {
             g3: this.element.style.getPropertyValue('--court-gradient-3')
         };
 
-        // Update the content
+        // Update the class and status
         this.element.className = `court-2d ${this.court.status}`;
+        
+        // Update the content
         this.element.innerHTML = `
             <div class="court-simulation">
                 ${this.renderHeader()}
@@ -1830,6 +1864,8 @@ class CourtView {
         // If game is in progress, start the timer
         if (this.court.status === 'in_progress' && this.court.startTime) {
             this.startGameTimer();
+        } else {
+            this.stopGameTimer();
         }
 
         console.groupEnd();
@@ -2422,13 +2458,46 @@ class PlayerListView {
 
         // Initialize UI and attach event listeners
         this.updatePlayersList();
-        this.attachEventListeners();
-        this.attachImportListeners(); // Add this new method call
+        this.initializeEventListeners();
     }
 
-    // Add this new method
-    attachImportListeners() {
-        // Handle both desktop and mobile import buttons
+    // Combine all event listener initialization into one method
+    initializeEventListeners() {
+        this.attachPlayerLevelListeners();
+        this.attachImportAndResetListeners();
+    }
+
+    // Renamed from attachEventListeners and focused on player level controls
+    attachPlayerLevelListeners() {
+        ['players-list', 'mobile-players-list'].forEach(listClass => {
+            const list = document.querySelector(`.${listClass}`);
+            if (!list) return;
+
+            list.addEventListener('click', (e) => {
+                const levelBtn = e.target.closest('.level-btn');
+                if (!levelBtn) return;
+
+                const playerItem = levelBtn.closest('.player-item');
+                if (!playerItem) return;
+
+                const playerId = playerItem.dataset.playerId;
+                const player = this.gameManager.players.get(playerId);
+                if (!player) return;
+
+                const action = levelBtn.dataset.action;
+                
+                if (action === 'increase-level' && player.skillLevel < 10) {
+                    this.gameManager.adjustPlayerLevel(playerId, player.skillLevel + 1);
+                } else if (action === 'decrease-level' && player.skillLevel > 1) {
+                    this.gameManager.adjustPlayerLevel(playerId, player.skillLevel - 1);
+                }
+            });
+        });
+    }
+
+    // Renamed from attachImportListeners and includes reset functionality
+    attachImportAndResetListeners() {
+        // Handle import buttons
         ['importButton', 'mobileImportButton'].forEach(btnId => {
             const button = document.getElementById(btnId);
             const textarea = document.getElementById(btnId === 'importButton' ? 'playerImport' : 'mobilePlayerImport');
@@ -2456,20 +2525,32 @@ class PlayerListView {
                 });
             }
         });
+
+        // Remove the reset button initialization from here since it's handled in the main initialization
     }
 
     // Update the existing updatePlayersList method
     updatePlayersList() {
         const playersList = document.querySelector('.players-list');
-        if (!playersList) return;
+        const mobilePlayers = document.querySelector('.mobile-players-list');
+        
+        if (!playersList && !mobilePlayers) return;
 
         // Sort players by name
         const sortedPlayers = Array.from(this.gameManager.players.values())
             .sort((a, b) => a.name.localeCompare(b.name));
 
-        playersList.innerHTML = sortedPlayers.length > 0
+        const playersHTML = sortedPlayers.length > 0
             ? sortedPlayers.map(player => this.renderPlayerItem(player)).join('')
-            : this.renderEmptyState(); // Use renderEmptyState instead of a simple div
+            : this.renderEmptyState();
+
+        // Update both desktop and mobile lists
+        if (playersList) {
+            playersList.innerHTML = playersHTML;
+        }
+        if (mobilePlayers) {
+            mobilePlayers.innerHTML = playersHTML;
+        }
     }
 
     registerEventListeners() {
@@ -2698,29 +2779,40 @@ class PlayerListView {
         this.updatePlayersList();
     }
 
-    attachEventListeners() {
-        const playersList = document.querySelector('.players-list');
-        
-        playersList.addEventListener('click', (e) => {
-            const levelBtn = e.target.closest('.level-btn');
-            if (!levelBtn) return;
+    // Add new method to handle reset
+    resetAllData() {
+        console.group('🗑️ Resetting All Data');
+        try {
+            // Clear all courts
+            this.gameManager.courts.forEach(court => {
+                court.players = [];
+                court.queue = [];
+                court.status = 'empty';
+                court.startTime = null;
+                if (court.timerId) {
+                    clearInterval(court.timerId);
+                    court.timerId = null;
+                }
+                // Emit court update event
+                this.eventBus.emit('court:updated', court);
+            });
 
-            const playerItem = levelBtn.closest('.player-item');
-            if (!playerItem) return;
-
-            const playerId = playerItem.dataset.playerId;
-            const player = this.gameManager.players.get(playerId);
-            if (!player) return;
-
-            const action = levelBtn.dataset.action;
+            // Clear all players
+            this.gameManager.players.clear();
             
-            // Update level checks to 10
-            if (action === 'increase-level' && player.skillLevel < 10) {
-                this.gameManager.adjustPlayerLevel(playerId, player.skillLevel + 1);
-            } else if (action === 'decrease-level' && player.skillLevel > 1) {
-                this.gameManager.adjustPlayerLevel(playerId, player.skillLevel - 1);
-            }
-        });
+            // Clear local storage
+            this.gameManager.storage.clear();
+            
+            // Emit events to update UI
+            this.eventBus.emit('players:updated');
+            
+            Toast.show('All data has been reset', Toast.types.SUCCESS);
+            console.log('✅ Reset completed successfully');
+        } catch (error) {
+            console.error('Failed to reset data:', error);
+            Toast.show('Failed to reset data', Toast.types.ERROR);
+        }
+        console.groupEnd();
     }
 }
 
@@ -3519,3 +3611,80 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize pull-to-refresh
     const pullToRefresh = new PullToRefresh();
 });
+
+// Find the event handler for 'players:updated' and update it to handle both lists
+class UIManager {
+    // ... existing code ...
+
+    handlePlayersUpdated() {
+        console.group('🔄 Updating Players Lists');
+        
+        // Get both desktop and mobile containers
+        const desktopList = document.getElementById('playersList');
+        const mobileList = document.querySelector('.mobile-players-list');
+        
+        if (!desktopList && !mobileList) {
+            console.warn('No player lists found in DOM');
+            console.groupEnd();
+            return;
+        }
+
+        // Get sorted players
+        const sortedPlayers = Array.from(this.gameManager.players.values())
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        // Generate HTML for players
+        const playersHTML = sortedPlayers.map(player => this.createPlayerHTML(player)).join('');
+
+        // Update both lists with the same content
+        if (desktopList) {
+            desktopList.innerHTML = playersHTML;
+        }
+        if (mobileList) {
+            mobileList.innerHTML = playersHTML;
+        }
+
+        // Attach event listeners to both lists
+        [desktopList, mobileList].forEach(list => {
+            if (list) {
+                this.attachPlayerEventListeners(list);
+            }
+        });
+
+        console.log(`Updated ${sortedPlayers.length} players in lists`);
+        console.groupEnd();
+    }
+
+    // Helper method to create consistent player HTML
+    createPlayerHTML(player) {
+        return `
+            <div class="player-item" data-player-id="${player.id}">
+                <div class="player-info">
+                    <span class="player-name">${player.name}</span>
+                    <div class="player-stats">
+                        <span class="games-played">
+                            <i class="fas fa-trophy"></i>
+                            ${this.formatGamesPlayed(player.gamesPlayed)}
+                        </span>
+                        <span class="last-game">
+                            <i class="fas fa-clock"></i>
+                            ${this.formatLastGameTime(player.lastGameTime)}
+                        </span>
+                    </div>
+                </div>
+                <div class="player-statuses">
+                    ${this.getStatusBadgesHTML(player)}
+                </div>
+            </div>
+        `;
+    }
+
+    // Helper method to attach event listeners
+    attachPlayerEventListeners(container) {
+        const playerItems = container.querySelectorAll('.player-item');
+        playerItems.forEach(item => {
+            // Reattach any existing click handlers or other interactions
+            // ... existing event listener code ...
+        });
+    }
+}
