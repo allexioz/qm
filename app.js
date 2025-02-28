@@ -168,6 +168,175 @@ class Court {
         this.startTime = null;
         this.startedFromQueue = false;
     }
+
+    processMagicQueue() {
+        if (this.processingMagicQueue) return;
+        this.processingMagicQueue = true;
+
+        console.group('🎯 Processing Magic Queue');
+        try {
+            // Get all available players
+            const availablePlayers = this.gameManager.getAvailablePlayers()
+                .filter(p => p.status === 'nogames' || p.status === 'waiting');
+
+            if (availablePlayers.length < 4) {
+                console.log('Not enough available players for magic queue');
+                return;
+            }
+
+            // Sort by priority factors
+            const sortedPlayers = availablePlayers.sort((a, b) => {
+                // First priority: Players who haven't played any games
+                if (a.gamesPlayed === 0 && b.gamesPlayed > 0) return -1;
+                if (b.gamesPlayed === 0 && a.gamesPlayed > 0) return 1;
+
+                // Second priority: Last game time
+                if (!a.lastGameTime && b.lastGameTime) return -1;
+                if (!b.lastGameTime && a.lastGameTime) return 1;
+                if (a.lastGameTime && b.lastGameTime) {
+                    return a.lastGameTime - b.lastGameTime;
+                }
+
+                // Third priority: Games played count
+                return a.gamesPlayed - b.gamesPlayed;
+            });
+
+            // Take top 8 players for consideration (or all if less than 8)
+            const candidates = sortedPlayers.slice(0, Math.min(8, sortedPlayers.length));
+            
+            // Find the most balanced combination of 4 players
+            const bestGroup = this.findBalancedGroup(candidates);
+            
+            if (bestGroup) {
+                console.log('Found balanced group:', bestGroup);
+                this.queue = bestGroup;
+                this.status = 'ready';
+                this.gameManager.updateCourtStatus(this);
+            } else {
+                console.log('No balanced group found');
+                // Fall back to original selection method
+                this.queue = sortedPlayers.slice(0, 4);
+            }
+
+        } catch (error) {
+            console.error('Error in magic queue:', error);
+        } finally {
+            this.processingMagicQueue = false;
+            console.groupEnd();
+        }
+    }
+
+    findBalancedGroup(players) {
+        if (players.length < 4) return null;
+
+        // First sort players by skill level
+        const sortedPlayers = [...players].sort((a, b) => b.skillLevel - a.skillLevel);
+        
+        // Group players by skill ranges
+        const advanced = sortedPlayers.filter(p => p.skillLevel >= 7);
+        const intermediate = sortedPlayers.filter(p => p.skillLevel >= 4 && p.skillLevel <= 6);
+        const beginner = sortedPlayers.filter(p => p.skillLevel <= 3);
+
+        // Try to form groups within same skill range first
+        let combinations = [];
+        
+        // Try advanced players first
+        if (advanced.length >= 4) {
+            combinations = this.getCombinations(advanced, 4);
+        }
+        // Then try intermediate
+        else if (intermediate.length >= 4) {
+            combinations = this.getCombinations(intermediate, 4);
+        }
+        // Then try beginners
+        else if (beginner.length >= 4) {
+            combinations = this.getCombinations(beginner, 4);
+        }
+        // Only if we can't form same-range groups, try mixed (but close) levels
+        else {
+            combinations = this.getCombinations(sortedPlayers, 4);
+        }
+
+        let bestGroup = null;
+        let bestScore = Infinity;
+
+        for (const group of combinations) {
+            const score = this.evaluateGroupBalance(group);
+            if (score < bestScore) {
+                bestScore = score;
+                bestGroup = group;
+            }
+        }
+
+        // If best score is Infinity, no valid group was found
+        if (bestScore === Infinity) return null;
+        return bestGroup;
+    }
+
+    evaluateGroupBalance(group) {
+        // Sort players by skill level before forming teams
+        const sortedPlayers = [...group].sort((a, b) => b.skillLevel - a.skillLevel);
+        
+        // Form teams with adjacent skill levels
+        const teamA = [sortedPlayers[0], sortedPlayers[3]]; // Best + Worst
+        const teamB = [sortedPlayers[1], sortedPlayers[2]]; // 2nd + 3rd best
+
+        // Calculate team stats
+        const getTeamStats = (team) => {
+            const skillDiff = Math.abs(team[0].skillLevel - team[1].skillLevel);
+            const totalPower = team[0].skillLevel + team[1].skillLevel;
+            
+            return {
+                skillDiff,
+                totalPower,
+                isValidTeam: skillDiff <= 1
+            };
+        };
+
+        const teamAStats = getTeamStats(teamA);
+        const teamBStats = getTeamStats(teamB);
+
+        // Immediate disqualifications
+        if (!teamAStats.isValidTeam || !teamBStats.isValidTeam) {
+            return Infinity;
+        }
+
+        // Team power must be nearly equal
+        const powerDifference = Math.abs(teamAStats.totalPower - teamBStats.totalPower);
+        if (powerDifference > 1) {
+            return Infinity;
+        }
+
+        // All players must be within 2 levels of each other
+        const maxLevel = Math.max(...group.map(p => p.skillLevel));
+        const minLevel = Math.min(...group.map(p => p.skillLevel));
+        if (maxLevel - minLevel > 2) {
+            return Infinity;
+        }
+
+        // Scoring
+        return powerDifference * 100;
+    }
+
+    getCombinations(array, size) {
+        const result = [];
+        
+        function combine(start, combo) {
+            if (combo.length === size) {
+                result.push([...combo]);
+                return;
+            }
+            
+            for (let i = start; i < array.length; i++) {
+                combo.push(array[i]);
+                combine(i + 1, combo);
+                combo.pop();
+            }
+        }
+        
+        combine(0, []);
+        return result;
+    }
 }
 
 // Infrastructure
@@ -1487,10 +1656,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Apply initial gradients
     applyCourtGradients();
     
-    // Add this near the top of your initialization code
+    // Move this function to the top level, outside any event handlers
     function initializeSidebarToggle() {
         const container = document.querySelector('.container');
         const sidebar = document.querySelector('.sidebar');
+        
+        if (!container || !sidebar) {
+            console.error('Required elements not found');
+            return;
+        }
+
+        console.log('Initializing sidebar toggle and drag...');
+        
+        // Store the sidebar width before collapsing
+        let previousWidth = localStorage.getItem('sidebarWidth') || '300px';
         
         // Create toggle button
         const toggleBtn = document.createElement('button');
@@ -1498,32 +1677,111 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
         toggleBtn.setAttribute('aria-label', 'Toggle sidebar');
         
-        // Insert toggle button
-        container.insertBefore(toggleBtn, sidebar);
+        // Create drag handle with more visible styling
+        const dragHandle = document.createElement('div');
+        dragHandle.className = 'sidebar-drag-handle';
+        dragHandle.innerHTML = '<div class="drag-handle-line"></div>';
         
-        // Add click handler
+        // Insert elements
+        container.insertBefore(toggleBtn, sidebar);
+        sidebar.appendChild(dragHandle);
+        
+        // Add click handler for toggle
         toggleBtn.addEventListener('click', () => {
-            container.classList.toggle('sidebar-collapsed');
-            // Update button icon
-            toggleBtn.innerHTML = container.classList.contains('sidebar-collapsed') 
+            const isCollapsed = container.classList.toggle('sidebar-collapsed');
+            toggleBtn.innerHTML = isCollapsed 
                 ? '<i class="fas fa-chevron-right"></i>' 
                 : '<i class="fas fa-chevron-left"></i>';
             
-            // Save preference
-            localStorage.setItem('sidebarCollapsed', container.classList.contains('sidebar-collapsed'));
+            if (isCollapsed) {
+                previousWidth = sidebar.style.width || '300px';
+                sidebar.style.width = '0';
+            } else {
+                sidebar.style.width = previousWidth;
+            }
+            
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
         });
         
-        // Restore previous state
+        // Restore previous collapse state
         if (localStorage.getItem('sidebarCollapsed') === 'true') {
             container.classList.add('sidebar-collapsed');
             toggleBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+            sidebar.style.width = '0';
+        } else {
+            // Restore previous width if saved
+            const savedWidth = localStorage.getItem('sidebarWidth');
+            if (savedWidth) {
+                sidebar.style.width = savedWidth;
+                previousWidth = savedWidth;
+            }
         }
+        
+        // Drag functionality
+        let isDragging = false;
+        let startX;
+        let startWidth;
+        
+        const startDragging = (e) => {
+            // Don't start dragging if sidebar is collapsed
+            if (container.classList.contains('sidebar-collapsed')) {
+                return;
+            }
+            
+            isDragging = true;
+            startX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            startWidth = sidebar.offsetWidth;
+            document.body.classList.add('sidebar-dragging');
+        };
+
+        const doDrag = (e) => {
+            if (!isDragging) return;
+            
+            const currentX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const delta = currentX - startX;
+            const newWidth = Math.max(200, Math.min(600, startWidth + delta));
+            
+            sidebar.style.width = `${newWidth}px`;
+            previousWidth = `${newWidth}px`;
+            e.preventDefault();
+        };
+
+        const stopDragging = () => {
+            if (!isDragging) return;
+            
+            isDragging = false;
+            document.body.classList.remove('sidebar-dragging');
+            localStorage.setItem('sidebarWidth', sidebar.style.width);
+        };
+
+        // Mouse events
+        dragHandle.addEventListener('mousedown', startDragging);
+        document.addEventListener('mousemove', doDrag);
+        document.addEventListener('mouseup', stopDragging);
+        document.addEventListener('mouseleave', stopDragging);
+
+        // Touch events
+        dragHandle.addEventListener('touchstart', startDragging, { passive: false });
+        document.addEventListener('touchmove', doDrag, { passive: false });
+        document.addEventListener('touchend', stopDragging);
+        document.addEventListener('touchcancel', stopDragging);
+
+        // Double click to reset width
+        dragHandle.addEventListener('dblclick', () => {
+            if (!container.classList.contains('sidebar-collapsed')) {
+                sidebar.style.width = '300px';
+                previousWidth = '300px';
+                localStorage.setItem('sidebarWidth', '300px');
+            }
+        });
     }
 
-    // Call this function after DOM is loaded
-    document.addEventListener('DOMContentLoaded', () => {
+    // Call the initialization function when the DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeSidebarToggle);
+    } else {
         initializeSidebarToggle();
-    });
+    }
     
     console.groupEnd();
 
@@ -2224,6 +2482,34 @@ class QuickAddModal {
         } else {
             this.initialize();
         }
+
+        // Add skill level filter
+        this.skillLevelFilter = 0; // 0 means no filter
+        this.initializeSkillFilter();
+    }
+
+    initializeSkillFilter() {
+        const filterContainer = document.createElement('div');
+        filterContainer.className = 'skill-filter';
+        filterContainer.innerHTML = `
+            <label>Skill Level Filter:</label>
+            <select id="quickAddSkillFilter">
+                <option value="0">All Levels</option>
+                ${Array.from({length: 10}, (_, i) => i + 1).map(level => `
+                    <option value="${level}">Level ${level} - ${this.gameManager.getSkillLevelName(level)}</option>
+                `).join('')}
+            </select>
+        `;
+
+        // Insert after search input
+        const searchInput = document.getElementById('quickAddSearchInput');
+        searchInput.parentNode.insertBefore(filterContainer, searchInput.nextSibling);
+
+        // Add event listener
+        document.getElementById('quickAddSkillFilter').addEventListener('change', (e) => {
+            this.skillLevelFilter = parseInt(e.target.value);
+            this.refreshAvailablePlayers();
+        });
     }
 
     initialize() {
@@ -2312,12 +2598,18 @@ class QuickAddModal {
             return;
         }
 
-        // Match the Queue Modal's simpler, cleaner design
+        // Enhanced player chip with skill level
         playersList.innerHTML = players.map(player => `
             <div class="player-chip ${this.selectedPlayers.has(player.id) ? 'selected' : ''}" 
                  data-player-id="${player.id}">
                 <div class="player-info">
-                    <span class="player-name">${player.name}</span>
+                    <div class="player-header">
+                        <span class="player-name">${player.name}</span>
+                        <span class="skill-badge level-${player.skillLevel}" 
+                              title="${this.gameManager.getSkillLevelName(player.skillLevel)}">
+                            Lvl ${player.skillLevel} • ${this.gameManager.getSkillLevelName(player.skillLevel)}
+                        </span>
+                    </div>
                     <span class="player-stats">
                         Games: ${player.gamesPlayed} | 
                         Status: ${formatPlayerStatus(player.status)}
@@ -2380,6 +2672,9 @@ class QuickAddModal {
         let allPlayers = this.gameManager.getAvailablePlayers();
         
         switch(criteria) {
+            case 'skill':
+                allPlayers.sort((a, b) => b.skillLevel - a.skillLevel);
+                break;
             case 'games':
                 allPlayers.sort((a, b) => b.gamesPlayed - a.gamesPlayed);
                 break;
@@ -2392,6 +2687,11 @@ class QuickAddModal {
                 break;
             default: // 'name'
                 allPlayers.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        // Apply skill level filter if active
+        if (this.skillLevelFilter > 0) {
+            allPlayers = allPlayers.filter(p => p.skillLevel === this.skillLevelFilter);
         }
 
         this.renderPlayers(allPlayers);
@@ -2410,7 +2710,21 @@ class QuickAddModal {
         this.currentCourt = court;
         this.selectedPlayers.clear();
         this.element.classList.add('active');
-        this.refreshAvailablePlayers();
+        
+        // Get the currently active sort button or default to 'name'
+        const activeSortBtn = this.element.querySelector('.sort-btn.active');
+        const sortCriteria = activeSortBtn ? activeSortBtn.dataset.sort : 'name';
+        
+        // Make sure the 'name' sort button is active by default if no other is
+        if (!activeSortBtn) {
+            const nameBtn = this.element.querySelector('.sort-btn[data-sort="name"]');
+            if (nameBtn) {
+                nameBtn.classList.add('active');
+            }
+        }
+        
+        // Refresh players with the correct sort
+        this.refreshAvailablePlayers(sortCriteria);
     }
 
     hide() {
@@ -2419,13 +2733,13 @@ class QuickAddModal {
         this.currentCourt = null;
     }
 
-    refreshAvailablePlayers() {
+    refreshAvailablePlayers(sortCriteria = 'name') {
         // Get ALL players for manual override functionality
         const availablePlayers = this.gameManager.getAvailablePlayers();
         console.log('Available players for quick add:', availablePlayers);
         
-        // Render the players
-        this.renderPlayers(availablePlayers);
+        // Sort players using the specified criteria
+        this.sortPlayers(sortCriteria);
         
         // Update selected count display
         this.updateSelectedCount();
@@ -2910,6 +3224,34 @@ class QueueModal {
         this.selectedPlayers = new Set();
         this.currentCourt = null;
         this.initialize();
+
+        // Add skill level filter
+        this.skillLevelFilter = 0; // 0 means no filter
+        this.initializeSkillFilter();
+    }
+
+    initializeSkillFilter() {
+        const filterContainer = document.createElement('div');
+        filterContainer.className = 'skill-filter';
+        filterContainer.innerHTML = `
+            <label>Skill Level Filter:</label>
+            <select id="skillFilter">
+                <option value="0">All Levels</option>
+                ${Array.from({length: 10}, (_, i) => i + 1).map(level => `
+                    <option value="${level}">Level ${level} - ${this.gameManager.getSkillLevelName(level)}</option>
+                `).join('')}
+            </select>
+        `;
+
+        // Insert after search input
+        const searchInput = document.getElementById('queueSearchInput');
+        searchInput.parentNode.insertBefore(filterContainer, searchInput.nextSibling);
+
+        // Add event listener
+        document.getElementById('skillFilter').addEventListener('change', (e) => {
+            this.skillLevelFilter = parseInt(e.target.value);
+            this.refreshAvailablePlayers();
+        });
     }
 
     initialize() {
@@ -2962,7 +3304,21 @@ class QueueModal {
         this.currentCourt = court;
         this.selectedPlayers.clear();
         this.element.classList.add('active');
-        this.refreshAvailablePlayers();
+        
+        // Get the currently active sort button or default to 'name'
+        const activeSortBtn = this.element.querySelector('.sort-btn.active');
+        const sortCriteria = activeSortBtn ? activeSortBtn.dataset.sort : 'name';
+        
+        // Make sure the 'name' sort button is active by default if no other is
+        if (!activeSortBtn) {
+            const nameBtn = this.element.querySelector('.sort-btn[data-sort="name"]');
+            if (nameBtn) {
+                nameBtn.classList.add('active');
+            }
+        }
+        
+        // Refresh players with the correct sort
+        this.refreshAvailablePlayers(sortCriteria);
     }
 
     hide() {
@@ -2971,13 +3327,13 @@ class QueueModal {
         this.currentCourt = null;
     }
 
-    refreshAvailablePlayers() {
+    refreshAvailablePlayers(sortCriteria = 'name') {
         // Get ALL players for manual override functionality
         const availablePlayers = this.gameManager.getAvailablePlayers();
         console.log('Available players for queue:', availablePlayers);
         
-        // Render the players
-        this.renderPlayers(availablePlayers);
+        // Sort players using the specified criteria
+        this.sortPlayers(sortCriteria);
         
         // Update selected count display
         this.updateSelectedCount();
@@ -3030,11 +3386,18 @@ class QueueModal {
             return;
         }
 
+        // Enhanced player chip with skill level
         playersList.innerHTML = players.map(player => `
             <div class="player-chip ${this.selectedPlayers.has(player.id) ? 'selected' : ''}" 
                  data-player-id="${player.id}">
                 <div class="player-info">
-                    <span class="player-name">${player.name}</span>
+                    <div class="player-header">
+                        <span class="player-name">${player.name}</span>
+                        <span class="skill-badge level-${player.skillLevel}" 
+                              title="${this.gameManager.getSkillLevelName(player.skillLevel)}">
+                            Lvl ${player.skillLevel} • ${this.gameManager.getSkillLevelName(player.skillLevel)}
+                        </span>
+                    </div>
                     <span class="player-stats">
                         Games: ${player.gamesPlayed} | 
                         Status: ${formatPlayerStatus(player.status)}
@@ -3075,6 +3438,9 @@ class QueueModal {
         let allPlayers = this.gameManager.getAvailablePlayers();
         
         switch(criteria) {
+            case 'skill':
+                allPlayers.sort((a, b) => b.skillLevel - a.skillLevel);
+                break;
             case 'games':
                 allPlayers.sort((a, b) => b.gamesPlayed - a.gamesPlayed);
                 break;
@@ -3087,6 +3453,11 @@ class QueueModal {
                 break;
             default: // 'name'
                 allPlayers.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        // Apply skill level filter if active
+        if (this.skillLevelFilter > 0) {
+            allPlayers = allPlayers.filter(p => p.skillLevel === this.skillLevelFilter);
         }
 
         this.renderPlayers(allPlayers);

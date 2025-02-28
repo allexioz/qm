@@ -34,17 +34,24 @@ body {
 
 .container {
     display: flex;
-    min-height: 100vh;
+    position: relative;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .sidebar {
-    width: var(--sidebar-width);
+    position: relative; /* For absolute positioning of drag handle */
+    min-width: 200px;
+    max-width: 600px;
+    width: 300px; /* Default width */
+    transition: width 0.2s ease; /* Smooth width changes */
     background-color: white;
     border-right: 1px solid #E5E5EA;
     padding: var(--spacing-md);
     display: flex;
     flex-direction: column;
     min-height: 0; /* Important for nested flex scrolling */
+    z-index: 10; /* Ensure sidebar is above other content */
 }
 
 .sidebar-header {
@@ -110,10 +117,12 @@ body {
     background: white;
     margin-bottom: var(--spacing-sm);
     display: flex;
-    align-items: center;
+    align-items: flex-start; /* Change from center to flex-start */
     justify-content: space-between;
     transition: all 0.2s ease;
     border: 1px solid rgba(0, 0, 0, 0.05);
+    min-width: 0; /* Enable flex item shrinking */
+    gap: var(--spacing-md); /* Add gap between info and statuses */
 }
 
 .player-item:hover {
@@ -125,11 +134,17 @@ body {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    min-width: 0; /* Enable flex item shrinking */
+    flex: 1; /* Allow it to grow and shrink */
 }
 
 .player-name {
     font-weight: 500;
     color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0; /* Enable text truncation */
 }
 
 .player-stats {
@@ -139,6 +154,7 @@ body {
     font-size: 0.85em;
     color: #666;
     flex-wrap: wrap;
+    min-width: 0; /* Enable flex item shrinking */
 }
 
 .games-played, .last-game, .status-badge {
@@ -160,10 +176,11 @@ body {
     gap: 4px;
     flex-wrap: wrap;
     justify-content: flex-end;
+    flex-shrink: 0; /* Prevent status badges from shrinking */
 }
 
 .status-badge {
-    font-size: 1em; /* Match other stats size */
+    font-size: 0.85em;
     padding: 2px 6px;
     border-radius: 4px;
     display: flex;
@@ -171,6 +188,8 @@ body {
     gap: 4px;
     background: rgba(0, 0, 0, 0.05);
     color: #666;
+    flex-shrink: 0; /* Prevent badge from shrinking */
+    white-space: nowrap; /* Prevent text wrapping */
 }
 
 .status-badge i {
@@ -243,8 +262,12 @@ body {
 }
 
 .main-content {
-    flex-grow: 1;
+    flex: 1;
+    min-width: 0; /* Allow content to shrink below its preferred width */
+    overflow-y: auto;
     padding: var(--spacing-lg);
+    position: relative;
+    z-index: 5; /* Below sidebar but above other content */
 }
 
 .courts-container {
@@ -2561,6 +2584,9 @@ body {
 .player-header {
     display: flex;
     align-items: center;
+    gap: 8px;
+    flex-wrap: wrap; /* Allow wrapping for small screens */
+    min-width: 0; /* Enable flex item shrinking */
 }
 
 .skill-badge {
@@ -2572,7 +2598,8 @@ body {
     font-weight: 500;
     min-width: 48px;
     justify-content: center;
-    white-space: nowrap; /* Prevent wrapping */
+    white-space: nowrap;
+    flex-shrink: 0; /* Prevent badge from shrinking */
 }
 
 .skill-badge.level-1 { background: #E1E1E1; color: #666; }    /* Novice */
@@ -2895,4 +2922,122 @@ body {
     .button-container {
         gap: var(--spacing-sm); /* Slightly smaller gap on mobile */
     }
+}
+
+/* Sidebar drag handle */
+.sidebar-drag-handle {
+    position: absolute;
+    top: 0;
+    right: -8px;
+    width: 16px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 1000; /* Ensure it's above everything */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    touch-action: none; /* Prevent scrolling while dragging on touch devices */
+}
+
+/* Visual indicator for the drag handle */
+.drag-handle-line {
+    width: 4px;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 2px;
+    transition: background-color 0.2s;
+}
+
+.sidebar-drag-handle:hover .drag-handle-line {
+    background: rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-dragging .drag-handle-line {
+    background: var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+}
+
+/* Prevent text selection while dragging */
+.sidebar-dragging {
+    user-select: none !important;
+    cursor: col-resize !important;
+}
+
+.sidebar-dragging * {
+    user-select: none !important;
+    pointer-events: none;
+}
+
+/* Update sidebar styles */
+.sidebar {
+    position: relative;
+    min-width: 200px;
+    max-width: 600px;
+    width: 300px;
+    transition: width 0.2s ease;
+    z-index: 100;
+    will-change: width;
+}
+
+/* When dragging, disable transitions */
+.sidebar-dragging .sidebar {
+    transition: none;
+}
+
+/* Add responsive adjustments for very small screens */
+@media (max-width: 400px) {
+    .player-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .player-statuses {
+        justify-content: flex-start;
+        margin-top: var(--spacing-sm);
+    }
+}
+
+/* Update sidebar styles for collapse animation */
+.sidebar {
+    position: relative;
+    min-width: 0; /* Allow complete collapse */
+    max-width: 600px;
+    width: 300px;
+    transition: width 0.2s ease;
+    z-index: 100;
+    will-change: width;
+}
+
+/* Handle collapsed state */
+.container.sidebar-collapsed .sidebar {
+    width: 0 !important;
+    min-width: 0;
+    padding: 0;
+    border: none;
+}
+
+/* Adjust toggle button position */
+.sidebar-toggle-btn {
+    position: absolute;
+    left: 100%;
+    top: 20px;
+    z-index: 101;
+    background: white;
+    border: 1px solid #E5E5EA;
+    border-left: none;
+    padding: 8px;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.container.sidebar-collapsed .sidebar-toggle-btn {
+    transform: translateX(-100%);
+}
+
+/* Hide drag handle when collapsed */
+.container.sidebar-collapsed .sidebar-drag-handle {
+    display: none;
 }
