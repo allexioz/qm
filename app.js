@@ -729,6 +729,9 @@ class GameManager {
         console.group('📥 Loading State');
         const state = this.storage.load();
 
+        // Load game history
+        this.gameHistory = state.gameHistory || [];
+
         // Load players
         state.players.forEach(playerData => {
             const player = new Player(playerData.name);
@@ -742,14 +745,6 @@ class GameManager {
             const courtData = state.courts[courtId];
             const court = courtData ? Court.fromJSON(courtData) : new Court(courtId);
             this.courts.set(courtId, court);
-            
-            // Log court state after restoration
-            console.log('Restored court state:', {
-                id: court.id,
-                status: court.status,
-                startTime: court.startTime,
-                hasTimer: !!court.timerId
-            });
         });
 
         // Restore timers for in-progress games
@@ -763,7 +758,8 @@ class GameManager {
             players: Array.from(this.players.values()),
             courts: Object.fromEntries(
                 Array.from(this.courts.entries()).map(([id, court]) => [id, court.toJSON()])
-            )
+            ),
+            gameHistory: this.gameHistory || []
         };
         console.log('Saving state:', state);
         this.storage.save(state);
@@ -1021,6 +1017,26 @@ class GameManager {
         try {
             const court = this.courts.get(courtId);
             if (!court) throw new Error(`Court ${courtId} not found`);
+
+            // Store the game record before clearing the court
+            const gameRecord = {
+                id: `${courtId}-${Date.now()}`,
+                timestamp: Date.now(),
+                teamA: court.players.slice(0, 2).map(p => p.id),
+                teamB: court.players.slice(2, 4).map(p => p.id),
+                courtId: courtId
+            };
+
+            // Add game record to history
+            if (!this.gameHistory) {
+                this.gameHistory = [];
+            }
+            this.gameHistory.push(gameRecord);
+
+            // Trim history to keep last 100 games
+            if (this.gameHistory.length > 100) {
+                this.gameHistory = this.gameHistory.slice(-100);
+            }
 
             // Update player statuses and increment games count
             court.players.forEach(playerId => {
@@ -1315,37 +1331,28 @@ class GameManager {
 
     // Get history of how often players have played together
     getTeammateHistory() {
-        // This would ideally come from a persistent data store
-        // For now, we'll derive it from game history if available
-        
-        // Create a map where keys are "playerId1:playerId2" and values are count
         const teammateCount = new Map();
         
-        // For each court that has had games
-        this.courts.forEach(court => {
-            // Skip courts with no players or fewer than 4 players
-            if (!court.players || court.players.length < 4) return;
-            
-            // Assume first two players are team A and last two are team B
-            // This is a simplification - in reality you'd track actual teams
-            const teamA = court.players.slice(0, 2);
-            const teamB = court.players.slice(2, 4);
-            
-            // Count teammate relationships
-            this.incrementTeammateCount(teamA[0], teamA[1], teammateCount);
-            this.incrementTeammateCount(teamB[0], teamB[1], teammateCount);
-        });
+        // Use gameHistory instead of current court state
+        if (this.gameHistory) {
+            this.gameHistory.forEach(game => {
+                // Count teamA partnerships
+                this.countPartnerships(game.teamA, teammateCount);
+                // Count teamB partnerships
+                this.countPartnerships(game.teamB, teammateCount);
+            });
+        }
         
         return teammateCount;
     }
 
-    // Helper to increment teammate count
-    incrementTeammateCount(player1, player2, countMap) {
-        if (!player1 || !player2) return;
+    // Helper method to count partnerships
+    countPartnerships(team, countMap) {
+        if (team.length !== 2) return;
         
         // Create a consistent key regardless of player order
-        const ids = [player1.id, player2.id].sort();
-        const key = ids.join(':');
+        const [id1, id2] = team.sort();
+        const key = `${id1}:${id2}`;
         
         countMap.set(key, (countMap.get(key) || 0) + 1);
     }
