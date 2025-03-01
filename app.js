@@ -229,93 +229,159 @@ class Court {
     findBalancedGroup(players) {
         if (players.length < 4) return null;
 
-        // First sort players by skill level
+        // Sort players by skill level
         const sortedPlayers = [...players].sort((a, b) => b.skillLevel - a.skillLevel);
         
-        // Group players by skill ranges
-        const advanced = sortedPlayers.filter(p => p.skillLevel >= 7);
-        const intermediate = sortedPlayers.filter(p => p.skillLevel >= 4 && p.skillLevel <= 6);
-        const beginner = sortedPlayers.filter(p => p.skillLevel <= 3);
+        // Dynamically determine skill tiers based on current player pool
+        const getSkillTiers = (players) => {
+            const skills = players.map(p => p.skillLevel);
+            const maxSkill = Math.max(...skills);
+            const minSkill = Math.min(...skills);
+            
+            // Split the range into thirds
+            const range = maxSkill - minSkill;
+            const tierSize = range / 3;
+            
+            return {
+                advanced: minSkill + (tierSize * 2),    // Top third
+                intermediate: minSkill + tierSize,       // Middle third
+                // Bottom third is anything below intermediate
+            };
+        };
 
-        // Try to form groups within same skill range first
+        const tiers = getSkillTiers(sortedPlayers);
+        
+        // Group players by relative skill level
+        const advanced = sortedPlayers.filter(p => p.skillLevel >= tiers.advanced);
+        const intermediate = sortedPlayers.filter(p => p.skillLevel >= tiers.intermediate && p.skillLevel < tiers.advanced);
+        const beginner = sortedPlayers.filter(p => p.skillLevel < tiers.intermediate);
+
         let combinations = [];
         
-        // Try advanced players first
+        // Try to form groups within same relative skill range first
         if (advanced.length >= 4) {
             combinations = this.getCombinations(advanced, 4);
         }
-        // Then try intermediate
         else if (intermediate.length >= 4) {
             combinations = this.getCombinations(intermediate, 4);
         }
-        // Then try beginners
         else if (beginner.length >= 4) {
             combinations = this.getCombinations(beginner, 4);
         }
-        // Only if we can't form same-range groups, try mixed (but close) levels
         else {
-            combinations = this.getCombinations(sortedPlayers, 4);
+            // If we can't form same-tier groups, try to find close-skill groups
+            for (let i = 0; i < sortedPlayers.length - 3; i++) {
+                const group = sortedPlayers.slice(i, i + 4);
+                // Use relative skill gap check
+                const maxInGroup = Math.max(...group.map(p => p.skillLevel));
+                const minInGroup = Math.min(...group.map(p => p.skillLevel));
+                const totalRange = maxSkill - minSkill;
+                // Allow mixing if the group's range is less than half the total range
+                if ((maxInGroup - minInGroup) <= totalRange / 2) {
+                    combinations.push(group);
+                }
+            }
         }
 
         let bestGroup = null;
         let bestScore = Infinity;
 
         for (const group of combinations) {
-            const score = this.evaluateGroupBalance(group);
+            const score = this.evaluateGroupBalance(group, tiers);
             if (score < bestScore) {
                 bestScore = score;
                 bestGroup = group;
             }
         }
 
-        // If best score is Infinity, no valid group was found
-        if (bestScore === Infinity) return null;
-        return bestGroup;
+        return bestScore === Infinity ? null : bestGroup;
     }
 
-    evaluateGroupBalance(group) {
-        // Sort players by skill level before forming teams
+    evaluateGroupBalance(group, tiers) {
         const sortedPlayers = [...group].sort((a, b) => b.skillLevel - a.skillLevel);
         
-        // Form teams with adjacent skill levels
-        const teamA = [sortedPlayers[0], sortedPlayers[3]]; // Best + Worst
-        const teamB = [sortedPlayers[1], sortedPlayers[2]]; // 2nd + 3rd best
+        // Try both team formations
+        const possibleTeamings = [
+            // Traditional balance
+            {
+                teamA: [sortedPlayers[0], sortedPlayers[3]],
+                teamB: [sortedPlayers[1], sortedPlayers[2]]
+            },
+            // Keep similar skills together
+            {
+                teamA: [sortedPlayers[0], sortedPlayers[1]],
+                teamB: [sortedPlayers[2], sortedPlayers[3]]
+            }
+        ];
 
-        // Calculate team stats
-        const getTeamStats = (team) => {
-            const skillDiff = Math.abs(team[0].skillLevel - team[1].skillLevel);
-            const totalPower = team[0].skillLevel + team[1].skillLevel;
-            
-            return {
-                skillDiff,
-                totalPower,
-                isValidTeam: skillDiff <= 1
-            };
-        };
+        let bestTeaming = null;
+        let bestScore = Infinity;
 
-        const teamAStats = getTeamStats(teamA);
-        const teamBStats = getTeamStats(teamB);
-
-        // Immediate disqualifications
-        if (!teamAStats.isValidTeam || !teamBStats.isValidTeam) {
-            return Infinity;
+        for (const teaming of possibleTeamings) {
+            const score = this.evaluateTeaming(teaming, tiers);
+            if (score < bestScore) {
+                bestScore = score;
+                bestTeaming = teaming;
+            }
         }
 
-        // Team power must be nearly equal
-        const powerDifference = Math.abs(teamAStats.totalPower - teamBStats.totalPower);
-        if (powerDifference > 1) {
-            return Infinity;
+        if (bestScore === Infinity) return Infinity;
+
+        const { teamA, teamB } = bestTeaming;
+        const powerA = teamA[0].skillLevel + teamA[1].skillLevel;
+        const powerB = teamB[0].skillLevel + teamB[1].skillLevel;
+        const powerDifference = Math.abs(powerA - powerB);
+
+        // Base score on power difference
+        let score = powerDifference * 100;
+
+        // Relative skill gap checks
+        const allSkills = group.map(p => p.skillLevel);
+        const maxSkill = Math.max(...allSkills);
+        const minSkill = Math.min(...allSkills);
+        const skillGap = maxSkill - minSkill;
+
+        // Prefer keeping relative skill levels together
+        const isTopTier = teamA[0].skillLevel >= tiers.advanced || teamB[0].skillLevel >= tiers.advanced;
+        if (isTopTier && skillGap <= 1) {
+            score -= 1000; // Strong bonus for close-skill high level games
         }
 
-        // All players must be within 2 levels of each other
-        const maxLevel = Math.max(...group.map(p => p.skillLevel));
-        const minLevel = Math.min(...group.map(p => p.skillLevel));
-        if (maxLevel - minLevel > 2) {
-            return Infinity;
+        // Perfect balance bonus
+        if (powerDifference === 0) {
+            score -= 500;
         }
 
-        // Scoring
-        return powerDifference * 100;
+        return score;
+    }
+
+    evaluateTeaming(teaming, tiers) {
+        const { teamA, teamB } = teaming;
+        
+        // Calculate relative skill differences
+        const skillDiffA = Math.abs(teamA[0].skillLevel - teamA[1].skillLevel);
+        const skillDiffB = Math.abs(teamB[0].skillLevel - teamB[1].skillLevel);
+        
+        // Use total skill range to determine acceptable gaps
+        const totalRange = Math.max(
+            ...teamA.map(p => p.skillLevel),
+            ...teamB.map(p => p.skillLevel)
+        ) - Math.min(
+            ...teamA.map(p => p.skillLevel),
+            ...teamB.map(p => p.skillLevel)
+        );
+        
+        const maxAcceptableGap = Math.max(2, totalRange / 3);
+        
+        // Don't allow gaps larger than 1/3 of the total range
+        if (skillDiffA > maxAcceptableGap || skillDiffB > maxAcceptableGap) {
+            return Infinity;
+        }
+        
+        const powerA = teamA[0].skillLevel + teamA[1].skillLevel;
+        const powerB = teamB[0].skillLevel + teamB[1].skillLevel;
+        
+        return Math.abs(powerA - powerB);
     }
 
     getCombinations(array, size) {
@@ -1031,8 +1097,18 @@ class GameManager {
         // Step 2: Select top players with weighted randomness
         const selectedPlayers = this.selectPlayersWithWeightedRandomness(playerScores);
         
-        // Step 3: Form teams with consideration for teammate history
-        const teams = this.formBalancedTeams(selectedPlayers);
+        // NEW: Get the most recent game for each selected player
+        const recentGames = new Map();
+        selectedPlayers.forEach(player => {
+            const lastGame = this.getRecentGames(player.id, 1)[0];
+            if (lastGame) {
+                recentGames.set(player.id, lastGame);
+            }
+        });
+
+        // Step 3: Form teams with consideration for teammate history and recent partnerships
+        // Enhanced to completely avoid repeat partnerships from last game
+        const teams = this.formBalancedTeams(selectedPlayers, recentGames);
         
         // Flatten teams back into a single array for the court
         const finalPlayers = [...teams.teamA, ...teams.teamB];
@@ -1051,6 +1127,9 @@ class GameManager {
         
         // Find the max games played for normalization
         const maxGamesPlayed = Math.max(...players.map(p => p.gamesPlayed), 1);
+
+        // Get teammate history to factor into scores
+        const teammateHistory = this.getTeammateHistory();
         
         // Calculate scores for each player
         return players.map(player => {
@@ -1096,6 +1175,26 @@ class GameManager {
                     score -= 100;
                     break;
             }
+
+            // NEW Factor 5: Partner diversity score
+            // Calculate how many unique partners this player has had
+            const partnerCount = new Set();
+            teammateHistory.forEach((count, key) => {
+                if (key.includes(player.id)) {
+                    const [id1, id2] = key.split(':');
+                    const partnerId = id1 === player.id ? id2 : id1;
+                    partnerCount.add(partnerId);
+                }
+            });
+
+            // Reward players who have played with fewer partners
+            const uniquePartnersPenalty = partnerCount.size * 10;
+            score -= uniquePartnersPenalty;
+            
+            // NEW Factor 6: Skill level matching
+            const avgSkillLevel = players.reduce((sum, p) => sum + p.skillLevel, 0) / players.length;
+            const skillDiff = Math.abs(player.skillLevel - avgSkillLevel);
+            score -= skillDiff * 15; // Significant penalty for skill mismatch
             
             // Ensure score doesn't go negative
             score = Math.max(score, 1);
@@ -1166,7 +1265,7 @@ class GameManager {
     }
 
     // Form balanced teams considering teammate history
-    formBalancedTeams(players) {
+    formBalancedTeams(players, recentGames) {
         console.log('Forming balanced teams...');
         
         // Create a map to track how often players have played together
@@ -1175,7 +1274,7 @@ class GameManager {
         // Try different team combinations to find the most balanced one
         const possibleTeams = this.generateTeamCombinations(players);
         
-        // Score each team combination based on teammate history
+        // Score each team combination based on teammate history and recent partnerships
         const scoredTeams = possibleTeams.map(teams => {
             const teamA = teams.teamA;
             const teamB = teams.teamB;
@@ -1184,29 +1283,30 @@ class GameManager {
             const teamAFamiliarity = this.calculateTeamFamiliarity(teamA, teammateHistory);
             const teamBFamiliarity = this.calculateTeamFamiliarity(teamB, teammateHistory);
             
+            // NEW: Calculate cross-team familiarity to ensure varied opponents too
+            const crossTeamFamiliarity = this.calculateCrossTeamFamiliarity(teamA, teamB, teammateHistory);
+            
             // We want to minimize familiarity to avoid teammate fatigue
-            const totalFamiliarity = teamAFamiliarity + teamBFamiliarity;
+            // Heavily weight teammate familiarity over opponent familiarity
+            const totalFamiliarity = (teamAFamiliarity + teamBFamiliarity) * 2 + crossTeamFamiliarity;
+            
+            // NEW: Add extreme penalty for repeat partnerships from last game
+            const recentPartnershipPenalty = this.calculateRecentPartnershipPenalty(teams, recentGames);
+            
+            // NEW: Add skill level balance consideration
+            const skillBalancePenalty = this.calculateSkillBalancePenalty(teams);
             
             return {
                 teams,
-                score: totalFamiliarity
+                score: totalFamiliarity + recentPartnershipPenalty + skillBalancePenalty
             };
         });
         
         // Sort by score ascending (lower is better - less teammate fatigue)
         scoredTeams.sort((a, b) => a.score - b.score);
         
-        // Add some randomness - don't always pick the absolute best
-        // 70% chance to pick from top 3 combinations
-        const randomFactor = Math.random();
-        let selectedIndex = 0;
-        
-        if (randomFactor < 0.7 && scoredTeams.length >= 3) {
-            // Pick randomly from top 3
-            selectedIndex = Math.floor(Math.random() * 3);
-        }
-        
-        const selectedTeams = scoredTeams[selectedIndex].teams;
+        // NEW: Always pick the best combination that avoids recent partnerships
+        const selectedTeams = scoredTeams[0].teams;
         console.log('Team A:', selectedTeams.teamA.map(p => p.name));
         console.log('Team B:', selectedTeams.teamB.map(p => p.name));
         
@@ -1258,7 +1358,68 @@ class GameManager {
         const ids = [team[0].id, team[1].id].sort();
         const key = ids.join(':');
         
-        return teammateHistory.get(key) || 0;
+        // NEW: Apply exponential weighting to repeat partnerships
+        const partnershipCount = teammateHistory.get(key) || 0;
+        return Math.pow(partnershipCount, 1.5); // Exponential penalty for repeat partnerships
+    }
+
+    // NEW: Calculate familiarity between opposing teams
+    calculateCrossTeamFamiliarity(teamA, teamB, teammateHistory) {
+        let totalFamiliarity = 0;
+        
+        // Check each player in team A against each player in team B
+        for (const playerA of teamA) {
+            for (const playerB of teamB) {
+                const ids = [playerA.id, playerB.id].sort();
+                const key = ids.join(':');
+                totalFamiliarity += teammateHistory.get(key) || 0;
+            }
+        }
+        
+        return totalFamiliarity;
+    }
+
+    // NEW: Calculate penalty for recent partnerships with extreme penalty for last game
+    calculateRecentPartnershipPenalty(teams, recentGames) {
+        let penalty = 0;
+        
+        // Check both teams for recent partnerships
+        for (const team of [teams.teamA, teams.teamB]) {
+            const [player1, player2] = team;
+            
+            // Get most recent games for both players
+            const player1LastGame = recentGames.get(player1.id);
+            const player2LastGame = recentGames.get(player2.id);
+            
+            if (player1LastGame && player2LastGame && player1LastGame.id === player2LastGame.id) {
+                // If these players were partners in their last game, apply massive penalty
+                const werePartners = this.werePlayersPartners(player1, player2, player1LastGame);
+                if (werePartners) {
+                    penalty += 100000; // Extreme penalty to prevent repeat partnerships
+                }
+            }
+        }
+        
+        return penalty;
+    }
+
+    // NEW: Helper to check if players were partners in a specific game
+    werePlayersPartners(player1, player2, game) {
+        if (!game || !game.teamA || !game.teamB) return false;
+        
+        const bothInTeamA = game.teamA.includes(player1.id) && game.teamA.includes(player2.id);
+        const bothInTeamB = game.teamB.includes(player1.id) && game.teamB.includes(player2.id);
+        
+        return bothInTeamA || bothInTeamB;
+    }
+
+    // NEW: Calculate penalty for skill level imbalance
+    calculateSkillBalancePenalty(teams) {
+        const teamAAvg = teams.teamA.reduce((sum, p) => sum + p.skillLevel, 0) / 2;
+        const teamBAvg = teams.teamB.reduce((sum, p) => sum + p.skillLevel, 0) / 2;
+        
+        // Penalize skill level differences between teams
+        return Math.abs(teamAAvg - teamBAvg) * 50;
     }
 
     // Generate all possible team combinations from 4 players
@@ -1544,6 +1705,68 @@ class GameManager {
 
         return score;
     }
+
+    // Add this new method to get recent games for a player
+    getRecentGames(playerId, limit = 1) {
+        console.group('🎮 Getting Recent Games');
+        console.log('Player ID:', playerId, 'Limit:', limit);
+        
+        const recentGames = [];
+        const player = this.players.get(playerId);
+        
+        if (!player) {
+            console.warn('Player not found');
+            console.groupEnd();
+            return [];
+        }
+
+        // Look through all courts for completed games
+        this.courts.forEach(court => {
+            // Skip courts with no players
+            if (!court.players || court.players.length < 4) return;
+            
+            // Only consider completed games (where players have lastGameTime)
+            const gameTime = court.players[0]?.lastGameTime;
+            if (!gameTime) return;
+            
+            // Check if this player was in the game
+            const playerIndex = court.players.findIndex(p => p.id === playerId);
+            if (playerIndex === -1) return;
+            
+            // Determine which team the player was on
+            const teamA = court.players.slice(0, 2);
+            const teamB = court.players.slice(2, 4);
+            
+            const game = {
+                id: `${court.id}-${gameTime}`,
+                time: gameTime,
+                teamA: teamA.map(p => p.id),
+                teamB: teamB.map(p => p.id),
+                courtId: court.id
+            };
+            
+            recentGames.push(game);
+        });
+        
+        // Sort by most recent first
+        recentGames.sort((a, b) => b.time - a.time);
+        
+        // Return limited number of games
+        const result = recentGames.slice(0, limit);
+        console.log('Recent games found:', result);
+        console.groupEnd();
+        return result;
+    }
+
+    // Add helper method to check if players were partners in a game
+    werePlayersPartners(player1, player2, game) {
+        if (!game || !game.teamA || !game.teamB) return false;
+        
+        const bothInTeamA = game.teamA.includes(player1.id) && game.teamA.includes(player2.id);
+        const bothInTeamB = game.teamB.includes(player1.id) && game.teamB.includes(player2.id);
+        
+        return bothInTeamA || bothInTeamB;
+    }
 }
 
 // Initialize the app
@@ -1785,8 +2008,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     console.groupEnd();
 
-    // Initialize pull-to-refresh
-    const pullToRefresh = new PullToRefresh();
+    
 });
 
 function initializeTabs() {
@@ -3864,124 +4086,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.head.appendChild(styleElement);
 });
 
-// Add this near the top of the file, after other class definitions
-class PullToRefresh {
-    constructor() {
-        this.startY = 0;
-        this.threshold = 150;
-        this.refreshing = false;
-        this.initialize();
-    }
 
-    initialize() {
-        // Create refresh indicator element
-        const indicator = document.createElement('div');
-        indicator.className = 'pull-refresh-indicator';
-        indicator.innerHTML = `
-            <div class="pull-refresh-spinner">
-                <i class="fas fa-sync-alt"></i>
-            </div>
-            <span class="pull-refresh-text">Pull down to refresh</span>
-        `;
-        document.body.insertBefore(indicator, document.body.firstChild);
-        
-        this.indicator = indicator;
-        this.spinner = indicator.querySelector('.fa-sync-alt');
-        this.text = indicator.querySelector('.pull-refresh-text');
-        
-        this.attachEventListeners();
-    }
-
-    attachEventListeners() {
-        let pulling = false;
-        let distance = 0;
-
-        document.addEventListener('touchstart', (e) => {
-            // Only enable pull-to-refresh at the top of the page
-            if (window.scrollY === 0) {
-                this.startY = e.touches[0].pageY;
-                pulling = true;
-            }
-        }, { passive: true });
-
-        document.addEventListener('touchmove', (e) => {
-            if (!pulling || this.refreshing) return;
-
-            distance = e.touches[0].pageY - this.startY;
-            if (distance > 0) {
-                // Prevent default scrolling when pulling down
-                e.preventDefault();
-                
-                // Apply resistance to the pull
-                const resistance = 0.4;
-                const pullDistance = Math.min(distance * resistance, this.threshold);
-                
-                this.indicator.style.transform = `translateY(${pullDistance}px)`;
-                this.spinner.style.transform = `rotate(${pullDistance * 2}deg)`;
-                
-                // Update text based on pull distance
-                if (pullDistance >= this.threshold) {
-                    this.text.textContent = 'Release to refresh';
-                } else {
-                    this.text.textContent = 'Pull down to refresh';
-                }
-            }
-        }, { passive: false });
-
-        document.addEventListener('touchend', async () => {
-            if (!pulling || !distance) return;
-            
-            pulling = false;
-            
-            if (distance > this.threshold && !this.refreshing) {
-                await this.performRefresh();
-            } else {
-                this.resetIndicator();
-            }
-            
-            distance = 0;
-        });
-    }
-
-    async performRefresh() {
-        this.refreshing = true;
-        this.text.textContent = 'Refreshing...';
-        this.spinner.style.animation = 'spin 1s linear infinite';
-        
-        try {
-            // Clear all browser caches
-            if ('caches' in window) {
-                const cacheNames = await caches.keys();
-                await Promise.all(
-                    cacheNames.map(cacheName => caches.delete(cacheName))
-                );
-            }
-            
-            // Force reload from server
-            window.location.reload(true);
-        } catch (error) {
-            console.error('Refresh failed:', error);
-            Toast.show('Refresh failed', Toast.types.ERROR);
-            this.resetIndicator();
-        }
-    }
-
-    resetIndicator() {
-        this.indicator.style.transform = 'translateY(-100%)';
-        this.spinner.style.transform = 'rotate(0deg)';
-        this.spinner.style.animation = 'none';
-        this.text.textContent = 'Pull down to refresh';
-        this.refreshing = false;
-    }
-}
-
-// Add this to your initialization code
-document.addEventListener('DOMContentLoaded', () => {
-    // ... existing initialization code ...
-    
-    // Initialize pull-to-refresh
-    const pullToRefresh = new PullToRefresh();
-});
 
 // Find the event handler for 'players:updated' and update it to handle both lists
 class UIManager {
