@@ -852,7 +852,7 @@ class GameManager {
         const playerNames = namesText
             .split('\n')
             .map(name => name.trim())
-            .map(name => name.replace(/^\d+\.\s*/, '')) // Remove numbers and dots from start
+            .map(name => name.replace(/^\d+\.\s*/, ''))
             .map(name => name
                 .split(' ')
                 .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -883,12 +883,17 @@ class GameManager {
         // Save state and emit events
         this.saveState();
         this.eventBus.emit('players:updated');
+        
+        // NEW: Emit court updates to refresh all court views
+        this.courts.forEach(court => {
+            this.eventBus.emit('court:updated', court);
+        });
 
         if (newPlayers.length > 0) {
             console.log(`✅ Added ${newPlayers.length} new players`);
             return newPlayers.length;
         } else {
-            console.log('❌ No new players to add');
+            console.log('❌ All players already exist');
             throw new Error('All players already exist');
         }
 
@@ -1774,6 +1779,11 @@ class GameManager {
         
         return bothInTeamA || bothInTeamB;
     }
+
+    // Add this new method
+    hasRegisteredPlayers() {
+        return this.players.size >= 4; // Only return true if we have 4 or more players
+    }
 }
 
 // Initialize the app
@@ -2423,6 +2433,34 @@ class CourtView {
             console.group('🎯 Court Action Clicked');
             console.log('Button clicked:', actionButton);
 
+            // Add new case for add-players action
+            if (actionButton.dataset.action === 'add-players') {
+                // Check if we're on mobile by checking viewport width
+                const isMobile = window.innerWidth < 768; // Common breakpoint for mobile
+
+                if (isMobile) {
+                    // Mobile: Switch to players tab
+                    const playersTab = document.querySelector('[data-view="players"]');
+                    if (playersTab) {
+                        playersTab.click();
+                    }
+                }
+                
+                // Focus the appropriate textarea after a short delay
+                setTimeout(() => {
+                    const importTextarea = isMobile ? 
+                        document.getElementById('mobilePlayerImport') : 
+                        document.getElementById('playerImport');
+                    
+                    if (importTextarea) {
+                        importTextarea.focus();
+                        // Scroll the textarea into view
+                        importTextarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+                return;
+            }
+
             if (actionButton.classList.contains('start-game-btn')) {
                 console.log('Start game button clicked');
                 this.gameManager.startGame(this.court.id);
@@ -2558,6 +2596,21 @@ class CourtView {
     }
 
     renderActions() {
+        // Show "Add Players" button until we have at least 4 players
+        if (!this.gameManager.hasRegisteredPlayers()) {
+            const currentPlayerCount = this.gameManager.players.size;
+            const playersNeeded = 4 - currentPlayerCount;
+            return `
+                <div class="court-actions empty-state">
+                    <button class="action-btn add-players-btn" data-action="add-players">
+                        <i class="fas fa-user-plus"></i>
+                        Add ${playersNeeded} More Player${playersNeeded === 1 ? '' : 's'} to Start
+                    </button>
+                </div>
+            `;
+        }
+
+        // Existing button logic for when players exist
         let primaryButton = '';
         let queueButton = '';
         let completeButton = '';
@@ -4171,3 +4224,41 @@ class UIManager {
         });
     }
 }
+
+// Near the end of the file, where we add other dynamic styles
+document.addEventListener('DOMContentLoaded', function() {
+    // Add dynamic styles for the new status classes and empty state button
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        /* Existing status badge styles... */
+
+        /* Empty state court actions */
+        .court-actions.empty-state {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+        }
+
+        .add-players-btn {
+            width: 100%;
+            max-width: 300px;
+            padding: 12px;
+            font-size: 1rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .add-players-btn i {
+            font-size: 1.1em;
+        }
+    `;
+    document.head.appendChild(styleElement);
+});
