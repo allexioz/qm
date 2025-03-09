@@ -293,7 +293,7 @@ body {
 }
 
 .court-2d {
-    aspect-ratio: 1 / 2;
+    aspect-ratio: 1 / 1.5;
     width: 100%;
     position: relative;
     display: flex;
@@ -2633,6 +2633,8 @@ body {
     font-size: 10px;
     transition: all 0.2s ease;
 }
+
+
 
 .level-btn:hover:not(:disabled) {
     background: rgba(0, 0, 0, 0.1);
