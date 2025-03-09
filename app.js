@@ -815,6 +815,9 @@ class GameManager {
         try {
             court.startGame();
             
+            // Track game start
+            Analytics.trackGameStart(courtId, court.players);
+            
             // Update player statuses and increment games count
             court.players.forEach(player => {
                 const oldStatus = player.status;
@@ -1017,12 +1020,18 @@ class GameManager {
     }
 
     completeGame(courtId) {
+        const court = this.courts.get(courtId);
+        if (!court) return;
+
+        const duration = (Date.now() - court.startTime) / 1000;
+        const players = [...court.players];
+
+        // Track game completion
+        Analytics.trackGameComplete(courtId, duration, players);
+
         console.group('🏁 Complete Game Flow');
         
         try {
-            const court = this.courts.get(courtId);
-            if (!court) throw new Error(`Court ${courtId} not found`);
-
             // Store the game record before clearing the court
             const gameRecord = {
                 id: `${courtId}-${Date.now()}`,
@@ -3708,6 +3717,14 @@ class QueueModal {
     confirmSelection() {
         if (this.selectedPlayers.size === 4 && this.currentCourt) {
             const playerIds = Array.from(this.selectedPlayers);
+            
+            // Track queue join
+            Analytics.trackQueueAction(
+                Analytics.events.QUEUE_JOIN,
+                this.currentCourt.id,
+                playerIds.length
+            );
+
             this.gameManager.addToQueue(this.currentCourt.id, playerIds);
             Toast.show('Players added to queue', Toast.types.SUCCESS);
             this.hide();
@@ -4262,3 +4279,72 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     document.head.appendChild(styleElement);
 });
+
+class Analytics {
+    static events = {
+        GAME_START: 'game_start',
+        GAME_COMPLETE: 'game_complete',
+        QUEUE_JOIN: 'queue_join',
+        QUEUE_LEAVE: 'queue_leave',
+        PLAYER_ADD: 'player_add',
+        SKILL_UPDATE: 'skill_update'
+    };
+
+    static track(eventName, params = {}) {
+        // Only track if GA is available and not in development
+        if (typeof gtag === 'function' && !this.isDevelopment()) {
+            console.group('📊 Analytics Event:', eventName);
+            console.log('Parameters:', params);
+            
+            gtag('event', eventName, {
+                ...params,
+                timestamp: new Date().toISOString()
+            });
+            
+            console.groupEnd();
+        }
+    }
+
+    static isDevelopment() {
+        return window.location.hostname === 'localhost' || 
+               window.location.hostname === '127.0.0.1';
+    }
+
+    // Specific event tracking methods
+    static trackGameStart(courtId, players) {
+        this.track(this.events.GAME_START, {
+            court_id: courtId,
+            player_count: players.length,
+            skill_levels: players.map(p => p.skillLevel).join(',')
+        });
+    }
+
+    static trackGameComplete(courtId, duration, players) {
+        this.track(this.events.GAME_COMPLETE, {
+            court_id: courtId,
+            duration_seconds: duration,
+            player_count: players.length,
+            skill_levels: players.map(p => p.skillLevel).join(',')
+        });
+    }
+
+    static trackQueueAction(action, courtId, playerCount) {
+        this.track(action, {
+            court_id: courtId,
+            player_count: playerCount
+        });
+    }
+
+    static trackPlayerAdd(count) {
+        this.track(this.events.PLAYER_ADD, {
+            player_count: count
+        });
+    }
+
+    static trackSkillUpdate(oldLevel, newLevel) {
+        this.track(this.events.SKILL_UPDATE, {
+            old_level: oldLevel,
+            new_level: newLevel
+        });
+    }
+}
